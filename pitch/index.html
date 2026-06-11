@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Koffiebon — de digitale koffiekaart</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css" id="theme">
+
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- 1. TITLE -->
+      <section data-background-color="#1e1410">
+        <div class="hero">
+          <div class="brandmark">☕</div>
+          <h1 class="title">Koffiebon</h1>
+          <p class="subtitle">De digitale koffiekaart. Een <strong>prepaid kaart op koppen koffie</strong>.</p>
+          <p class="kicker">In de browser · getoond via QR · met geverifieerde e-mail</p>
+          <div class="pill-row">
+            <span class="pill">PWA + QR</span>
+            <span class="pill">E-mail geverifieerd</span>
+            <span class="pill">Fraudebestendig</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. WAT HET IS -->
+      <section data-background-color="#241811">
+        <h2>Wat het is</h2>
+        <p class="lead">Een klant koopt vooraf een aantal koppen koffie — bijvoorbeeld twaalf. Die staan op een digitale kaart die in de browser leeft en zich toont via een QR-code. Geen app, geen papier.</p>
+        <div class="grid-3">
+          <div class="card neutral"><div class="ic">☕</div><h3>Prepaid in koppen</h3><p>De kaart ís een aantal koppen koffie, vooruit betaald. De eenheid is een kop, niet een bedrag.</p></div>
+          <div class="card neutral"><div class="ic">📱</div><h3>Leeft in de browser</h3><p>Een PWA. Geen download, geen App Store, geen installatie.</p></div>
+          <div class="card neutral"><div class="ic">🔳</div><h3>Toont een QR</h3><p>Elke kop wordt afgeboekt doordat de balie de QR scant.</p></div>
+        </div>
+      </section>
+
+      <!-- 3. CUSTOMER FLOW -->
+      <section data-background-color="#1e1410">
+        <h2>Van e-mail tot eerste kop</h2>
+        <div class="flow">
+          <div class="step"><span class="num">1</span><div class="ic">✉️</div><h4>E-mail verifiëren</h4><p>Klant bevestigt zijn e-mail. Eénmalig.</p></div>
+          <div class="arrow">→</div>
+          <div class="step"><span class="num">2</span><div class="ic">🧾</div><h4>Kaart kopen</h4><p>Aan de balie. Betaalt fysiek (pin/contant).</p></div>
+          <div class="arrow">→</div>
+          <div class="step"><span class="num">3</span><div class="ic">✅</div><h4>Balie activeert</h4><p>Scan zet het saldo op 12.</p></div>
+          <div class="arrow">→</div>
+          <div class="step"><span class="num">4</span><div class="ic">📲</div><h4>QR in de PWA</h4><p>Telefoon toont de code bij elke koffie.</p></div>
+        </div>
+        <p class="note">Kaart kwijt of nieuwe telefoon? Eén herstel-link uit de bevestigingsmail laadt de kaart terug. Er ging nooit iets verloren — de kaart leeft op de server.</p>
+      </section>
+
+      <!-- 4. PWA + security -->
+      <section data-background-color="#241811">
+        <h2>De QR is "dom". De server is de waarheid.</h2>
+        <div class="split">
+          <div class="phone-wrap">
+            <svg viewBox="0 0 300 600" class="phone" role="img" aria-label="Telefoon met Koffiebon PWA en QR-code">
+              <rect x="8" y="8" width="284" height="584" rx="40" fill="#0d0906" stroke="#3a2a1d" stroke-width="3"/>
+              <rect x="20" y="22" width="260" height="556" rx="30" fill="#f5ece1"/>
+              <rect x="112" y="30" width="76" height="14" rx="7" fill="#0d0906"/>
+              <text x="150" y="84" text-anchor="middle" font-family="Georgia, serif" font-size="22" font-weight="bold" fill="#3a2418">☕ Koffiebon</text>
+              <text x="150" y="108" text-anchor="middle" font-family="Helvetica, Arial" font-size="12" fill="#9b7a5c">Jouw koffiekaart</text>
+              <text x="150" y="150" text-anchor="middle" font-family="Helvetica, Arial" font-size="13" fill="#9b7a5c">Nog te gaan</text>
+              <text x="150" y="186" text-anchor="middle" font-family="Georgia, serif" font-size="40" font-weight="bold" fill="#c5772a">9 / 12</text>
+              <rect x="50" y="204" width="200" height="10" rx="5" fill="#e3d3c1"/>
+              <rect x="50" y="204" width="150" height="10" rx="5" fill="#c5772a"/>
+              <g transform="translate(85,250)">
+                <rect x="-12" y="-12" width="154" height="154" rx="12" fill="#ffffff" stroke="#e3d3c1" stroke-width="2"/>
+                <g id="qr" fill="#1e1410"></g>
+              </g>
+              <text x="150" y="448" text-anchor="middle" font-family="Helvetica, Arial" font-size="12" fill="#9b7a5c">Verloopt over <tspan fill="#c5772a" font-weight="bold">0:27</tspan> · ververst vanzelf</text>
+              <rect x="50" y="470" width="200" height="44" rx="22" fill="#c5772a"/>
+              <text x="150" y="498" text-anchor="middle" font-family="Helvetica, Arial" font-size="14" font-weight="bold" fill="#fff">Toon aan de balie</text>
+              <text x="150" y="544" text-anchor="middle" font-family="Helvetica, Arial" font-size="11" fill="#b89a7e">Kaart kwijt? Herstel via e-mail</text>
+            </svg>
+          </div>
+          <div class="security-list">
+            <div class="sec"><span class="dot"></span><div><strong>Roterende, eenmalige QR per koffie.</strong> De PWA vraagt elke keer een verse code aan de server. Een screenshot is meteen waardeloos.</div></div>
+            <div class="sec"><span class="dot"></span><div><strong>Saldo staat centraal, niet op de telefoon.</strong> De balie boekt af op de server. Een kaart kan nóóit méér dan 12 keer.</div></div>
+            <div class="sec"><span class="dot"></span><div><strong>Eén gebaar.</strong> Eerste scan = activeren. Elke volgende scan = −1 koffie. De balie hoeft niks te kiezen.</div></div>
+            <div class="sec"><span class="dot"></span><div><strong>Herstelbaar.</strong> De PWA bewaart niets. Een link uit de e-mail laadt de kaart terug op elk toestel.</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. BALIE -->
+      <section data-background-color="#1e1410">
+        <h2>Aan de balie: scannen en klaar</h2>
+        <div class="balie">
+          <div class="balie-step">
+            <div class="big-ic">📷</div>
+            <h4>Scan de QR</h4>
+            <p>Met de baliescanner of een telefoon. Geen nieuw kassasysteem nodig.</p>
+          </div>
+          <div class="arrow big">→</div>
+          <div class="balie-step">
+            <div class="big-ic">🔒</div>
+            <h4>Server valideert</h4>
+            <p>Code geldig? Boek −1, verbrand de code. Ongeldig? Direct geweigerd.</p>
+          </div>
+          <div class="arrow big">→</div>
+          <div class="balie-step">
+            <div class="big-ic">☕</div>
+            <h4>Schenk de koffie</h4>
+            <p>Saldo 9 → 8. De klant ziet het live op de telefoon.</p>
+          </div>
+        </div>
+        <p class="note">Enige eis: internet aan de balie op het moment van scannen.</p>
+      </section>
+
+      <!-- 6. PRIJS EN MARGE (cups-first) -->
+      <section data-background-color="#241811">
+        <h2>Prijs en marge</h2>
+        <p class="lead small">De eenheid is een <strong>kop koffie</strong> — niet een bedrag.</p>
+        <div class="formula">
+          <div class="frow"><span class="flbl">Korting</span><span class="fval">cadeau-koppen ÷ koppen op de kaart &nbsp;<em>(staat los van de prijs)</em></span></div>
+          <div class="frow"><span class="flbl">Kaartprijs</span><span class="fval">betaalde koppen × prijs per kop</span></div>
+          <div class="frow"><span class="flbl">Marge per kaart</span><span class="fval">kaartprijs − (geleverde koppen × kostprijs per kop)</span></div>
+        </div>
+        <table class="econ">
+          <thead>
+            <tr><th>Model</th><th>Koppen op kaart</th><th>Betaald</th><th>Korting</th><th>Kaartprijs*</th><th>Marge*</th></tr>
+          </thead>
+          <tbody>
+            <tr class="hl"><td><strong>12 voor de prijs van 10</strong></td><td>12</td><td>10</td><td>16,7%</td><td>€30,00</td><td>€20,40</td></tr>
+            <tr><td>11 voor de prijs van 10</td><td>11</td><td>10</td><td>9,1%</td><td>€30,00</td><td>€21,20</td></tr>
+            <tr><td>12 voor de prijs van 11</td><td>12</td><td>11</td><td>8,3%</td><td>€33,00</td><td>€23,40</td></tr>
+          </tbody>
+        </table>
+        <p class="note muted">* Voorbeeld bij €3,00 per kop en €0,80 kostprijs per kop. Andere prijs per kop? Kaartprijs en marge schalen mee — de korting blijft gelijk.</p>
+      </section>
+
+      <!-- 7. STACK / SIMPEL -->
+      <section data-background-color="#1e1410">
+        <h2>Bewust simpel gebouwd</h2>
+        <div class="grid-4">
+          <div class="card neutral"><div class="ic">📱</div><h3>PWA, geen native app</h3><p>Eén webpagina. Geen App Store, geen reviewproces, geen installatie.</p></div>
+          <div class="card neutral"><div class="ic">🔳</div><h3>QR + e-mail</h3><p>Standaardtech die op elke telefoon werkt. Niets exotisch.</p></div>
+          <div class="card neutral"><div class="ic">💳</div><h3>Betaling fysiek — nu</h3><p>Start zonder integratie: pin/contant aan de balie.</p></div>
+          <div class="card neutral"><div class="ic">🟢</div><h3>Mollie — later</h3><p>Online opwaarderen en kopen wanneer je eraan toe bent. Optioneel.</p></div>
+        </div>
+      </section>
+
+      <!-- 8. ROADMAP -->
+      <section data-background-color="#241811">
+        <h2>Uitrol in drie fases</h2>
+        <div class="roadmap">
+          <div class="phase"><span class="ptag">Fase 1 · Nu</span><h4>Live aan de balie</h4><ul><li>PWA met roterende QR</li><li>E-mailverificatie + herstel</li><li>Balie activeert &amp; boekt af</li><li>Betaling fysiek (pin/contant)</li></ul></div>
+          <div class="phase"><span class="ptag">Fase 2</span><h4>Online &amp; betalen</h4><ul><li>Mollie-integratie</li><li>Zelf opwaarderen / kopen</li><li>Kaart cadeau doen</li></ul></div>
+          <div class="phase"><span class="ptag">Fase 3</span><h4>Groei</h4><ul><li>Dashboard met klantdata</li><li>Acties &amp; meerdere kaarttypes</li><li>Meerdere vestigingen</li></ul></div>
+        </div>
+      </section>
+
+      <!-- 9. COMPLIANCE -->
+      <section data-background-color="#1e1410">
+        <h2>Netjes geregeld</h2>
+        <div class="grid-3">
+          <div class="card neutral"><div class="ic">🧮</div><h3>Boekhouding</h3><p>Prepaid is vooruitontvangen geld. Omzet wordt geboekt bij verzilvering, niet bij verkoop.</p></div>
+          <div class="card neutral"><div class="ic">📅</div><h3>Geldigheidsduur</h3><p>Waardebonnen kennen in NL een minimale geldigheid. We stellen een ruime, faire termijn in.</p></div>
+          <div class="card neutral"><div class="ic">🔐</div><h3>Privacy</h3><p>Alleen een geverifieerd e-mailadres en saldo. Zo min mogelijk data, AVG-licht.</p></div>
+        </div>
+      </section>
+
+      <!-- 10. IN HET KORT -->
+      <section data-background-color="#241811">
+        <h2>In het kort</h2>
+        <div class="recap">
+          <div class="rrow"><span class="ric">☕</span><div><strong>Een kaart is koppen koffie</strong>, vooraf betaald. Prijs en korting zijn losse knoppen.</div></div>
+          <div class="rrow"><span class="ric">📱</span><div><strong>Een PWA toont een roterende QR.</strong> Geen app, geen papier, herstelbaar via e-mail.</div></div>
+          <div class="rrow"><span class="ric">🔒</span><div><strong>De server houdt het saldo bij.</strong> Eenmalige codes maken fraude zinloos.</div></div>
+          <div class="rrow"><span class="ric">🧾</span><div><strong>De balie activeert en boekt af</strong> met één scan. Betaling nu fysiek, later via Mollie.</div></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script>
+    // Draw a deterministic, stylized QR pattern into #qr
+    (function () {
+      const g = document.getElementById('qr');
+      if (!g) return;
+      const N = 13, cell = 130 / N;
+      const seed = [0b1011010110101,0b1000000000001,0b1011110111101,0b1010010100101,
+                    0b1011010110101,0b1000101000001,0b0110011001100,0b1001100110011,
+                    0b1010110101101,0b1000010000101,0b1011110111101,0b1000000000001,
+                    0b1011010110101];
+      let rects = '';
+      for (let r = 0; r < N; r++) {
+        for (let c = 0; c < N; c++) {
+          if ((seed[r] >> (N - 1 - c)) & 1) {
+            rects += `<rect x="${(c*cell).toFixed(2)}" y="${(r*cell).toFixed(2)}" width="${cell.toFixed(2)}" height="${cell.toFixed(2)}"/>`;
+          }
+        }
+      }
+      function finder(x, y) {
+        return `<rect x="${x}" y="${y}" width="${cell*3}" height="${cell*3}"/>`+
+               `<rect x="${x+cell*0.6}" y="${y+cell*0.6}" width="${cell*1.8}" height="${cell*1.8}" fill="#fff"/>`+
+               `<rect x="${x+cell*1.1}" y="${y+cell*1.1}" width="${cell*0.8}" height="${cell*0.8}" fill="#1e1410"/>`;
+      }
+      g.innerHTML = rects + finder(0,0) + finder(130-cell*3,0) + finder(0,130-cell*3);
+    })();
+
+    Reveal.initialize({
+      hash: true,
+      transition: 'slide',
+      controls: true,
+      progress: true,
+      slideNumber: 'c/t',
+      width: 1280,
+      height: 720,
+      margin: 0.04
+    });
+  </script>
+</body>
+</html>

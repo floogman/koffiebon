@@ -1,0 +1,59 @@
+services:
+    laravel.bon:
+        build:
+            context: ./docker/8.3
+            dockerfile: Dockerfile
+            args:
+                WWWGROUP: '${WWWGROUP}'
+        image: sail-8.3/koffiebon
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        ports:
+            - '${APP_PORT:-80}:80'
+            - '${VITE_PORT:-5173}:5173'
+        environment:
+            WWWUSER: '${WWWUSER}'
+            LARAVEL_SAIL: 1
+            XDEBUG_MODE: 'debug'
+            XDEBUG_CONFIG: 'client_host=host.docker.internal'
+            IGNITION_LOCAL_SITES_PATH: '${PWD}'
+            PHP_IDE_CONFIG: 'serverName=sail'
+        volumes:
+            - '.:/var/www/html'
+        networks:
+            - sail-bon
+    mailpit:
+        image: 'axllent/mailpit:latest'
+        ports:
+            - '${FORWARD_MAILPIT_PORT:-1025}:1025'
+            - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
+        networks:
+            - sail-bon
+    # Pgsql is beschikbaar voor productie/optioneel gebruik, maar start NIET standaard
+    # (lokaal dev draait op SQLite). Starten kan met: sail --profile pgsql up -d
+    pgsql:
+        image: 'postgis/postgis:15-3.4'
+        profiles:
+            - pgsql
+        ports:
+            - '${FORWARD_DB_PORT:-5432}:5432'
+        environment:
+            PGPASSWORD: '${DB_PASSWORD:-password}'
+            POSTGRES_DB: '${DB_DATABASE:-koffiebon}'
+            POSTGRES_USER: '${DB_USERNAME:-sail}'
+            POSTGRES_PASSWORD: '${DB_PASSWORD:-password}'
+        volumes:
+            - 'sail-pgsql-bon:/var/lib/postgresql/data'
+        networks:
+            - sail-bon
+        healthcheck:
+            test: ["CMD", "pg_isready", "-q", "-d", "${DB_DATABASE:-koffiebon}", "-U", "${DB_USERNAME:-sail}"]
+            retries: 3
+            timeout: 5s
+
+networks:
+    sail-bon:
+        driver: bridge
+volumes:
+    sail-pgsql-bon:
+        driver: local
