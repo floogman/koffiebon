@@ -6,6 +6,7 @@ use App\Enums\CardEventType;
 use App\Enums\CardStatus;
 use App\Exceptions\RedemptionException;
 use App\Models\Card;
+use App\Models\Drink;
 use App\Models\StaffUser;
 use Illuminate\Support\Facades\DB;
 
@@ -22,9 +23,9 @@ class RedemptionService
      *
      * @throws RedemptionException als de kaart niet (meer) verzilverbaar is.
      */
-    public function redeemCup(Card $card, ?StaffUser $staff = null): Card
+    public function redeemCup(Card $card, ?StaffUser $staff = null, ?Drink $drink = null): Card
     {
-        return DB::transaction(function () use ($card, $staff) {
+        return DB::transaction(function () use ($card, $staff, $drink) {
             // Atomaire, conditionele decrement. Slaagt voor hooguit één gelijktijdige scan.
             $affected = Card::query()
                 ->whereKey($card->getKey())
@@ -38,10 +39,15 @@ class RedemptionService
 
             $card->refresh();
 
+            // Snapshot van het geschonken drankje (type/maat/kostprijs) voor analytics.
             $card->events()->create([
                 'type' => CardEventType::Redeem,
                 'cups_delta' => -1,
                 'staff_user_id' => $staff?->getKey(),
+                'drink_id' => $drink?->getKey(),
+                'coffee_type' => $drink?->type,
+                'cup_size' => $drink?->size,
+                'cost_cents' => $drink?->cost_cents,
             ]);
 
             if ($card->cups_remaining === 0) {

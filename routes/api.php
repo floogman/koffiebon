@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Auth\CustomerAuthController;
 use App\Http\Controllers\Api\Pwa\PwaController;
+use App\Http\Controllers\Api\Staff\DashboardController;
 use App\Http\Controllers\Api\Staff\StaffAuthController;
 use App\Http\Controllers\Api\Staff\StaffController;
 use Illuminate\Support\Facades\Route;
@@ -46,8 +47,12 @@ Route::prefix('staff')->group(function () {
     Route::middleware(['auth:sanctum', 'abilities:staff'])->group(function () {
         Route::post('logout', [StaffAuthController::class, 'logout']);
         Route::get('products', [StaffController::class, 'products']);
+        Route::get('drinks', [StaffController::class, 'drinks']);
         Route::post('scan', [StaffController::class, 'scan'])->middleware('throttle:120,1');
         Route::post('cards', [StaffController::class, 'createCard']);
         Route::post('cards/{card}/activate', [StaffController::class, 'activateCard']);
+
+        // Merchant-dashboard (admin only, gecontroleerd in de controller).
+        Route::get('dashboard', [DashboardController::class, 'show']);
     });
 });

@@ -27,4 +27,9 @@ class Merchant extends Model
     {
         return $this->hasMany(CardProduct::class);
     }
+
+    public function drinks(): HasMany
+    {
+        return $this->hasMany(Drink::class);
+    }
 }

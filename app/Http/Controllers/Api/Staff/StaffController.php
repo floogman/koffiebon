@@ -10,9 +10,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\CardProductResource;
 use App\Http\Resources\CardResource;
 use App\Http\Resources\CustomerResource;
+use App\Http\Resources\DrinkResource;
 use App\Models\Card;
 use App\Models\CardProduct;
 use App\Models\Customer;
+use App\Models\Drink;
 use App\Services\CardIssuanceService;
 use App\Services\QrTokenService;
 use App\Services\RedemptionService;
@@ -37,13 +39,27 @@ class StaffController extends Controller
         return response()->json(['data' => CardProductResource::collection($products)]);
     }
 
+    /** GET /api/staff/drinks -> actieve drankenkaart van de merchant */
+    public function drinks(Request $request): JsonResponse
+    {
+        $drinks = Drink::where('merchant_id', $request->user()->merchant_id)
+            ->where('active', true)
+            ->orderBy('type')->orderBy('size')
+            ->get();
+
+        return response()->json(['data' => DrinkResource::collection($drinks)]);
+    }
+
     /**
-     * POST /api/staff/scan { nonce }
+     * POST /api/staff/scan { nonce, drink_id? }
      * Consumeert de token (single-use) en handelt identify of redeem af.
      */
     public function scan(Request $request): JsonResponse
     {
-        $data = $request->validate(['nonce' => ['required', 'string']]);
+        $data = $request->validate([
+            'nonce' => ['required', 'string'],
+            'drink_id' => ['nullable', 'integer'],
+        ]);
         $staff = $request->user();
 
         $token = $this->tokens->consume($data['nonce']);
@@ -75,12 +91,19 @@ class StaffController extends Controller
             ], 409);
         }
 
-        $card = $this->redemption->redeemCup($card, $staff);
+        // Optioneel: het geschonken drankje (type/maat) voor analytics; moet bij de merchant horen.
+        $drink = null;
+        if (! empty($data['drink_id'])) {
+            $drink = Drink::where('merchant_id', $staff->merchant_id)->find($data['drink_id']);
+        }
+
+        $card = $this->redemption->redeemCup($card, $staff, $drink);
 
         return response()->json([
             'type' => 'redeem',
             'result' => 'redeemed',
             'card' => new CardResource($card->load('cardProduct')),
+            'drink' => $drink ? new DrinkResource($drink) : null,
             'customer' => ['id' => $card->customer->id, 'email' => $card->customer->email],
         ]);
     }
