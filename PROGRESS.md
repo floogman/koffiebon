@@ -43,10 +43,29 @@ Zie de Definition of Done in `CLAUDE.md` §11.
   - `QrTokenTest` — TTL/single-use semantiek + nonce alleen gehasht (criterium 2, deels).
 - [x] **Geverifieerd via tinker**: grootboek = cache (12 + −3 = 9), pricing klopt (€30 prijs, €22,80 marge).
 
+### API + auth (af)
+
+- [x] **API-routing** handmatig bedraad in `bootstrap/app.php` (`api:` + Sanctum ability-aliases
+      `abilities`/`ability` + JSON-render voor `DomainException`).
+- [x] **Klant-auth (passwordless)**: `register` → ondertekende mail (Mailpit, via queue) → `verify`
+      (signed) → redirect met eenmalige **device-claim-code** → `claim` → Sanctum device-token.
+      `magic-link` voor herstel; geen e-mail-enumeratie.
+- [x] **Staff-auth**: `login`/`logout`, token met ability `staff`; rol op de staff-user.
+- [x] **QrTokenService**: uitgifte (nonce ≥128 bit, alleen gehasht opgeslagen, ~45s) + **atomische
+      single-use consumptie** (conditionele UPDATE op `consumed_at IS NULL`).
+- [x] **CardIssuanceService**: `issue+activate+payment` in één transactie; prijs server-side afgeleid;
+      e-mailverificatie verplicht. Losse `activate` voor pending kaarten.
+- [x] **Endpoints**: `/api/pwa/{me,cards/{card},tokens}` (customer) en
+      `/api/staff/{login,logout,products,scan,cards,cards/{card}/activate}` (staff), met throttling.
+- [x] **API-resources** (`Card`, `Customer`, `CardProduct`) zonder `data`-wrapper (consistente JSON).
+- [x] **Tests groen (28 / 83 asserts)**: `CustomerAuthTest`, `StaffAuthTest`, `ScanFlowTest`
+      (volledige flow A→C, single-use + verlopen token, criterium 1/5/7), plus de eerdere domein-tests.
+- [x] **Live geverifieerd op http://localhost**: staff-login + producten + scan (9→8) + dubbele scan
+      (409 `token_consumed`); register → queue → Mailpit → verify → claim → `/pwa/me`.
+- [x] `README.md` (setup + demo-credentials) en `API.md` geschreven.
+
 ### Nog te doen in fase 1
 
-- [ ] Klant-auth: register / verify (signed) / magic-link / claim — Mailpit lokaal.
-- [ ] Staff-auth + rol-gebaseerde abilities.
-- [ ] Token-uitgifte (`POST /api/pwa/tokens`) + atomische scan (`POST /api/staff/scan`) met single-use consumptie.
-- [ ] Kaart kopen/activeren aan de balie (`issue+activate+payment` in één transactie).
-- [ ] Klant-PWA (React/Vite) + balie-app (camera + hardware-scan).
+- [ ] Klant-PWA (React/Vite): installeerbaar, kaarten + roterende QR + herstel.
+- [ ] Balie-app (React/Vite): camera-scan (`@zxing/browser`) + hardware-scanner (keyboard-wedge),
+      activeren en afboeken.

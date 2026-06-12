@@ -1,58 +1,72 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Koffiebon
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Prepaid koffiekaart — vooruit betaald in **koppen koffie**, verzilverd aan de balie via een
+**roterende, eenmalige QR-code**. De server is de bron van waarheid voor het saldo; de QR is "dom".
 
-## About Laravel
+- **Backend:** Laravel 13 (API-only), Sanctum, Pest. Geld in hele centen, tijdzone `Europe/Amsterdam`.
+- **Frontend (volgt):** React + Vite PWA (klant) + balie-app.
+- Zie [`CLAUDE.md`](CLAUDE.md) voor de volledige opdracht/spec, [`API.md`](API.md) voor de endpoints,
+  en [`DECISIONS.md`](DECISIONS.md) / [`PROGRESS.md`](PROGRESS.md) voor keuzes en voortgang.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Lokale setup (Docker / Laravel Sail)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+> **Alle php/artisan/composer/npm-commando's draaien in de container.** De service heet `laravel.bon`;
+> `APP_SERVICE=laravel.bon` staat in `.env` zodat de `sail`-wrapper werkt.
 
 ```bash
-composer require laravel/boost --dev
+# 1. Env klaarzetten (eenmalig)
+cp .env.example .env
 
-php artisan boost:install
+# 2. Containers bouwen + starten (native arm64 op Apple Silicon)
+DOCKER_DEFAULT_PLATFORM=linux/arm64 docker compose up -d --build
+
+# 3. Dependencies, app key, database
+./vendor/bin/sail composer install
+./vendor/bin/sail artisan key:generate
+./vendor/bin/sail artisan migrate:fresh --seed
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+De app draait nu op **http://localhost** (API), Mailpit op **http://localhost:8025**.
 
-## Contributing
+Lokaal dev draait op **SQLite** (`database/database.sqlite`). PostgreSQL zit achter een compose-profile
+en hoeft niet te starten: `./vendor/bin/sail --profile pgsql up -d` indien gewenst.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### E-mail (verificatie / magic-link)
 
-## Code of Conduct
+E-mail gaat via de **queue** (database driver). Start een worker om verificatie-/herstelmails te
+versturen; ze landen in **Mailpit**:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+./vendor/bin/sail artisan queue:work
+```
 
-## Security Vulnerabilities
+## Tests
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+# Volledige suite (draait op SQLite :memory:)
+docker exec -w /var/www/html koffiebon-laravel.bon-1 php artisan test
+# of:
+./vendor/bin/sail pest
+```
 
-## License
+Belangrijke tests: `PricingServiceTest` (korting onafhankelijk van prijs), `RedemptionServiceTest`
+(parallelle verzilvering — nooit < 0 of > totaal), `ScanFlowTest` (volledige flow A→C + single-use/
+verlopen tokens, geverifieerd e-mailadres verplicht, herstel op ander toestel).
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Demo-data (na `migrate:fresh --seed`)
+
+| Rol   | E-mail                  | Wachtwoord |
+|-------|-------------------------|------------|
+| Admin | `admin@koffiebon.test`  | `password` |
+| Balie | `balie@koffiebon.test`  | `password` |
+| Klant | `klant@koffiebon.test`  | passwordless (device-token via e-mail) |
+
+De demo-klant heeft één actieve kaart **"12 voor de prijs van 10"** met saldo **9/12**.
+
+## De flow in het kort
+
+1. **Klant registreert** → e-mail verifiëren → PWA krijgt een device-token.
+2. **Kaart kopen** → klant toont identify-QR → balie scant → kiest product → legt betaling vast →
+   `issue + activate + payment` in één transactie → kaart actief.
+3. **Koffie verzilveren** → klant toont roterende redeem-QR → balie scant → `−1 kop` (atomisch).
+4. **Herstel** → magic-link op een ander toestel → zelfde kaarten/saldi vanaf de server.
