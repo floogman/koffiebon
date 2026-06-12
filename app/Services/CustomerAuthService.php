@@ -7,7 +7,6 @@ use App\Mail\CustomerLinkMail;
 use App\Models\Customer;
 use App\Models\DeviceClaim;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
 /**
@@ -27,7 +26,7 @@ class CustomerAuthService
         );
 
         Mail::to($customer->email)->send(
-            new CustomerLinkMail($this->verificationUrl($customer), isRecovery: false),
+            new CustomerLinkMail($customer, isRecovery: false),
         );
 
         return $customer;
@@ -46,7 +45,7 @@ class CustomerAuthService
         }
 
         Mail::to($customer->email)->send(
-            new CustomerLinkMail($this->verificationUrl($customer), isRecovery: true),
+            new CustomerLinkMail($customer, isRecovery: true),
         );
 
         return $customer;
@@ -98,15 +97,6 @@ class CustomerAuthService
         $token = $customer->createToken('pwa-device', ['customer'])->plainTextToken;
 
         return ['customer' => $customer, 'token' => $token];
-    }
-
-    private function verificationUrl(Customer $customer): string
-    {
-        return URL::temporarySignedRoute(
-            'api.auth.verify',
-            now()->addMinutes(config('koffiebon.verification_link_minutes')),
-            ['customer' => $customer->getKey()],
-        );
     }
 
     private function createDeviceClaim(Customer $customer): string

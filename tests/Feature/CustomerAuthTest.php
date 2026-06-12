@@ -16,6 +16,24 @@ it('registreert een klant en mailt een verificatielink', function () {
     Mail::assertQueued(CustomerLinkMail::class);
 });
 
+it('genereert de verificatielink op het verzendmoment, niet bij het in de wachtrij zetten', function () {
+    // Korte TTL om het effect van queue-vertraging zichtbaar te maken.
+    config(['koffiebon.verification_link_minutes' => 30]);
+    $customer = Customer::factory()->unverified()->create();
+
+    $mail = new CustomerLinkMail($customer);
+
+    // De mail blijft 2 uur in de wachtrij staan voordat hij verstuurd (gerenderd) wordt.
+    $this->travel(2)->hours();
+
+    preg_match('#https?://[^"\s]*/api/auth/verify/\d+\?[^"\s]+#', $mail->render(), $m);
+    $url = html_entity_decode($m[0]);
+
+    // De link is nog geldig: de TTL begon pas bij het renderen, niet 2 uur eerder.
+    $this->get($url)->assertRedirect();
+    expect($customer->fresh()->hasVerifiedEmail())->toBeTrue();
+});
+
 it('verifieert via een signed link en redirect met een claim-code', function () {
     $customer = Customer::factory()->unverified()->create();
 
