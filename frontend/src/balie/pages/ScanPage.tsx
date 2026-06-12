@@ -1,17 +1,20 @@
-import { useCallback, useRef, useState } from 'react'
-import type { Card, CardProduct, Customer, Staff } from '@shared/types'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
+import type { Card, CardProduct, Customer, Drink, Staff } from '@shared/types'
 import { staffApi } from '@shared/clients'
 import { isApiError } from '@shared/api'
 import { Banner, Logo, Screen, Spinner } from '@shared/ui'
 import CameraScanner from '../components/CameraScanner'
 import HardwareScanInput from '../components/HardwareScanInput'
 import NewCardFlow from '../components/NewCardFlow'
+import DrinkPicker from '../components/DrinkPicker'
 import { extractNonce } from '../scan'
 
 type View =
     | { kind: 'scan' }
     | { kind: 'identify'; customer: Customer; products: CardProduct[] }
-    | { kind: 'redeemed'; card: Card }
+    | { kind: 'redeemed'; card: Card; drink: Drink | null }
     | { kind: 'needs_activation'; card: Card }
     | { kind: 'done'; card: Card; title: string }
     | { kind: 'error'; message: string }
@@ -20,26 +23,39 @@ export default function ScanPage({ staff, onSignOut }: { staff: Staff | null; on
     const [view, setView] = useState<View>({ kind: 'scan' })
     const [camera, setCamera] = useState(true)
     const [manual, setManual] = useState('')
+    const [drinkType, setDrinkType] = useState('cappuccino')
+    const [drinkSize, setDrinkSize] = useState('medium')
     const busy = useRef(false)
 
-    const process = useCallback(async (raw: string) => {
-        if (busy.current) return
-        busy.current = true
-        try {
-            const res = await staffApi.scan(extractNonce(raw))
-            if (res.type === 'identify') {
-                setView({ kind: 'identify', customer: res.customer, products: res.products })
-            } else if (res.result === 'redeemed') {
-                setView({ kind: 'redeemed', card: res.card })
-            } else {
-                setView({ kind: 'needs_activation', card: res.card })
+    const { data: drinksData } = useQuery({ queryKey: ['drinks'], queryFn: staffApi.drinks })
+    const drinks = drinksData?.data ?? []
+
+    const selectedDrink = useMemo(
+        () => drinks.find((d) => d.type === drinkType && d.size === drinkSize),
+        [drinks, drinkType, drinkSize],
+    )
+
+    const process = useCallback(
+        async (raw: string) => {
+            if (busy.current) return
+            busy.current = true
+            try {
+                const res = await staffApi.scan(extractNonce(raw), selectedDrink?.id)
+                if (res.type === 'identify') {
+                    setView({ kind: 'identify', customer: res.customer, products: res.products })
+                } else if (res.result === 'redeemed') {
+                    setView({ kind: 'redeemed', card: res.card, drink: res.drink })
+                } else {
+                    setView({ kind: 'needs_activation', card: res.card })
+                }
+            } catch (e) {
+                setView({ kind: 'error', message: isApiError(e) ? e.message : 'Scan mislukt.' })
+            } finally {
+                busy.current = false
             }
-        } catch (e) {
-            setView({ kind: 'error', message: isApiError(e) ? e.message : 'Scan mislukt.' })
-        } finally {
-            busy.current = false
-        }
-    }, [])
+        },
+        [selectedDrink],
+    )
 
     const reset = () => {
         setView({ kind: 'scan' })
@@ -59,15 +75,22 @@ export default function ScanPage({ staff, onSignOut }: { staff: Staff | null; on
         <Screen>
             <header className="mb-5 flex items-center justify-between">
                 <Logo subtitle={staff ? `Balie · ${staff.name}` : 'Balie'} />
-                <button
-                    className="btn-ghost px-3 py-2 text-sm"
-                    onClick={async () => {
-                        await staffApi.logout().catch(() => {})
-                        onSignOut()
-                    }}
-                >
-                    Uitloggen
-                </button>
+                <div className="flex items-center gap-1">
+                    {staff?.role === 'admin' && (
+                        <Link className="btn-ghost px-3 py-2 text-sm" to="/dashboard">
+                            Dashboard
+                        </Link>
+                    )}
+                    <button
+                        className="btn-ghost px-3 py-2 text-sm"
+                        onClick={async () => {
+                            await staffApi.logout().catch(() => {})
+                            onSignOut()
+                        }}
+                    >
+                        Uitloggen
+                    </button>
+                </div>
             </header>
 
             {/* Hardware-scanner luistert alleen tijdens het scannen. */}
@@ -75,6 +98,16 @@ export default function ScanPage({ staff, onSignOut }: { staff: Staff | null; on
 
             {view.kind === 'scan' && (
                 <div className="flex flex-col gap-4">
+                    {drinks.length > 0 && (
+                        <DrinkPicker
+                            drinks={drinks}
+                            type={drinkType}
+                            size={drinkSize}
+                            onType={setDrinkType}
+                            onSize={setDrinkSize}
+                        />
+                    )}
+
                     <p className="text-sm text-muted">
                         Scan de QR van de klant met de camera of een hardware-scanner.
                     </p>
@@ -121,7 +154,11 @@ export default function ScanPage({ staff, onSignOut }: { staff: Staff | null; on
                     emoji="☕"
                     title="Geschonken!"
                     big={`nog ${view.card.cups_remaining}`}
-                    sub={`van ${view.card.cups_total} koppen`}
+                    sub={
+                        view.drink
+                            ? `${view.drink.type_label} · ${view.drink.size_label} — van ${view.card.cups_total} koppen`
+                            : `van ${view.card.cups_total} koppen`
+                    }
                     onNext={reset}
                 />
             )}

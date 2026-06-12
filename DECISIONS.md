@@ -72,6 +72,19 @@ Log van bewuste keuzes tijdens de bouw. Zie `CLAUDE.md` voor de opdracht/spec.
 - **Verificatie** van de UI via Chrome DevTools Protocol (Node 23, geen extra deps) — screenshots
   in `docs/screenshots/`.
 
+## Fase 3 — groei (vóór fase 2 gebouwd, op verzoek)
+
+- **Koffiesoort × maat als `drinks`-menukaart** (4×3), met kostprijs per drankje. Bewuste keuze:
+  **één verzilvering blijft één kop**, ongeacht soort/maat — consistent met de productfilosofie
+  ("elke kop gelijk, één gebaar") en houdt de invariant/test uit fase 1 intact. Soort/maat worden
+  op het redeem-event gesnapshot (`drink_id` + type/maat/kostprijs) voor analytics. Makkelijk te
+  wijzigen mocht een grote koffie later méér koppen moeten kosten.
+- **Dashboard rekent uit het grootboek** (geen aparte rapportagetabellen): omzet uit `payments`,
+  openstaande koppen uit actieve kaarten, drukte/drankjes uit redeem-events. Filterbaar op vestiging
+  en periode. Activity/by_drink in PHP gegroepeerd (portabel SQLite↔Postgres; datasets zijn klein).
+- **Admin-only** afgedwongen in de controller (`$staff->isAdmin()`), niet via ability — de rol staat
+  op de staff-user, het token heeft alleen ability `staff`.
+
 ## Werkwijze
 
 - **Alle php/artisan/composer/npm/npx-commando's draaien in de container** via `./vendor/bin/sail …`,

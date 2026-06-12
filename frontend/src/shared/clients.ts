@@ -1,6 +1,6 @@
 import { makeApi } from './api'
 import { customerToken, staffToken } from './auth'
-import type { Card, Customer, QrToken, ScanResult, Staff, CardProduct } from './types'
+import type { Card, Customer, QrToken, ScanResult, Staff, CardProduct, Drink, DashboardData } from './types'
 
 const customer = makeApi(customerToken.get)
 const staff = makeApi(staffToken.get)
@@ -22,7 +22,16 @@ export const staffApi = {
         anon.post<{ staff_token: string; staff: Staff }>('/staff/login', { email, password }),
     logout: () => staff.post<{ message: string }>('/staff/logout'),
     products: () => staff.get<{ data: CardProduct[] }>('/staff/products'),
-    scan: (nonce: string) => staff.post<ScanResult>('/staff/scan', { nonce }),
+    drinks: () => staff.get<{ data: Drink[] }>('/staff/drinks'),
+    scan: (nonce: string, drinkId?: number) => staff.post<ScanResult>('/staff/scan', { nonce, drink_id: drinkId }),
+    dashboard: (params: { location_id?: number; from?: string; to?: string } = {}) => {
+        const qs = new URLSearchParams()
+        if (params.location_id) qs.set('location_id', String(params.location_id))
+        if (params.from) qs.set('from', params.from)
+        if (params.to) qs.set('to', params.to)
+        const suffix = qs.toString() ? `?${qs}` : ''
+        return staff.get<DashboardData>(`/staff/dashboard${suffix}`)
+    },
     createCard: (customerId: number, productId: number, method: 'pin' | 'cash') =>
         staff.post<{ card: Card }>('/staff/cards', {
             customer_id: customerId,

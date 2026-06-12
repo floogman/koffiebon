@@ -85,7 +85,30 @@ Zie de Definition of Done in `CLAUDE.md` §11.
 > **Fase 1 DoD gehaald**: verse checkout via `README` opstartbaar; flow A→D werkt end-to-end
 > (API-tests + live HTTP + live in de PWA/balie-UI).
 
-### Volgende fases
+## Fase 3 — Groei (af)
 
-- **Fase 2** — Mollie achter `PaymentProvider`, kaart cadeau doen.
-- **Fase 3** — merchant-dashboard, meerdere producten/vestigingen.
+> Op verzoek vóór fase 2 gebouwd: 2 vestigingen, 4 koffiesoorten × 3 maten, merchant-dashboard.
+
+- [x] **Drankenkaart**: `CoffeeType` (regular/cappuccino/flat_white/espresso) × `CupSize`
+      (small/medium/large) als `drinks`-tabel met kostprijs per drankje (4×3 = 12).
+- [x] **Verzilvering legt het drankje vast** op het redeem-event (`drink_id` + snapshot type/maat/
+      kostprijs). **Eén verzilvering blijft één kop** — type/maat dienen voor keuze + analytics.
+- [x] **Twee vestigingen** (Centrum/Station) actief gebruikt: kaarten, staff en verzilveringen
+      zijn vestiging-gebonden; het dashboard filtert erop.
+- [x] **DashboardService** aggregeert uit het grootboek: omzet, openstaande koppen (verplichting),
+      drukte per dag, populairste drankjes (type×maat), terugkerende klanten — per vestiging + periode.
+- [x] **API**: `GET /api/staff/dashboard` (**admin only**) + `GET /api/staff/drinks`; `scan`
+      accepteert optioneel `drink_id`.
+- [x] **Seeder** met realistische data: 2 vestigingen, 12 drankjes, 3 producten, 14 klanten,
+      ~75 verzilveringen over ~30 dagen (spitsuren, gewogen drankkeuze).
+- [x] **Frontend**: balie-drank-keuze (soort × maat) meegestuurd bij de scan; **admin-dashboard**
+      (`/dashboard`) met KPI's, vestigingsfilter, drukte-grafiek, drank-breakdown, terugkerende klanten.
+- [x] **Tests groen (32 / 104 asserts)** incl. `DashboardTest`. **Live geverifieerd**: dashboard toont
+      18 kaarten / €414 omzet / 75 koppen, splitsing Centrum vs Station; balie-scan met drank →
+      "nog 8 · Flat White · Groot".
+
+> **Fase 3 DoD gehaald**: het dashboard toont echte cijfers uit het grootboek en multi-vestiging werkt.
+
+### Nog open
+
+- **Fase 2** — Mollie achter een `PaymentProvider`-interface; kaart cadeau doen aan een ander adres.

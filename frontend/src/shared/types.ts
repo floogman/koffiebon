@@ -47,10 +47,46 @@ export interface Staff {
     location_id: number | null
 }
 
+export interface Drink {
+    id: number
+    type: string
+    type_label: string
+    size: string
+    size_label: string
+    cost_cents: number
+}
+
 export type ScanResult =
     | { type: 'identify'; customer: Customer; products: CardProduct[] }
-    | { type: 'redeem'; result: 'redeemed'; card: Card; customer: { id: number; email: string } }
+    | { type: 'redeem'; result: 'redeemed'; card: Card; drink: Drink | null; customer: { id: number; email: string } }
     | { type: 'redeem'; result: 'needs_activation'; message: string; card: Card }
+
+export interface DashboardData {
+    range: { from: string; to: string }
+    locations: { id: number; name: string }[]
+    summary: {
+        cards_sold: number
+        active_cards: number
+        cups_outstanding: number
+        cups_redeemed: number
+        revenue_cents: number
+        drink_cost_cents: number
+    }
+    by_location: {
+        id: number
+        name: string
+        cards: number
+        cups_redeemed: number
+        cups_outstanding: number
+        revenue_cents: number
+    }[]
+    by_drink: {
+        by_type: { type: string; label: string; sizes: Record<string, number>; total: number }[]
+        by_size: { size: string; label: string; count: number }[]
+    }
+    activity: { date: string; count: number }[]
+    customers: { total: number; returning: number; one_time: number; avg_cups_per_customer: number }
+}
 
 export interface ApiError {
     code?: string

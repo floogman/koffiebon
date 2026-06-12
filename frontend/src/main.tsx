@@ -8,6 +8,7 @@ import CustomerApp from './customer/App'
 import ClaimPage from './customer/pages/ClaimPage'
 import DeeplinkPage from './customer/pages/DeeplinkPage'
 import BalieApp from './balie/App'
+import DashboardPage from './balie/pages/DashboardPage'
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -20,6 +21,7 @@ const router = createBrowserRouter([
     { path: '/claim', element: <ClaimPage /> },
     { path: '/s/:nonce', element: <DeeplinkPage /> },
     { path: '/balie/*', element: <BalieApp /> },
+    { path: '/dashboard', element: <DashboardPage /> },
 ])
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

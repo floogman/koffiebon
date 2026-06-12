@@ -78,17 +78,41 @@ Verwijdert het huidige token → `{ "message": "Uitgelogd." }`.
 → `{ "data": [ { id, name, cups_total, cups_paid, price_per_cup_cents, currency, validity_days,
 card_price_cents, gift_cups, discount_rate } ] }` — actieve producten van de merchant.
 
+### `GET /api/staff/drinks` _(staff)_
+→ `{ "data": [ { id, type, type_label, size, size_label, cost_cents } ] }` — de drankenkaart
+(4 soorten × 3 maten) van de merchant, voor de drank-keuze bij het verzilveren.
+
 ### `POST /api/staff/scan` _(staff)_
-Body: `{ "nonce": "..." }`. Consumeert de token **atomisch** (single-use) en handelt af op `purpose`:
+Body: `{ "nonce": "...", "drink_id"?: 1 }`. Consumeert de token **atomisch** (single-use) en handelt
+af op `purpose`:
 
 - **identify** → `{ "type": "identify", "customer": { ...kaarten }, "products": [ ... ] }`
   (start de nieuwe-kaart-flow).
 - **redeem**, kaart actief → `{ "type": "redeem", "result": "redeemed", "card": { ...nieuw saldo },
-  "customer": { id, email } }`.
+  "drink": { ... } | null, "customer": { id, email } }`. Een opgegeven `drink_id` wordt op het
+  redeem-event vastgelegd (type/maat/kostprijs) voor analytics; één scan blijft één kop.
 - **redeem**, kaart `pending` → `409 { "result": "needs_activation", ... }`.
 - leeg/verlopen/ongeldig → `409 card_not_redeemable` / `token_*`.
 
 _Throttle: 120/min._
+
+### `GET /api/staff/dashboard` _(staff, **admin only** → anders `403`)_
+Query: `location_id?` (vestiging van de merchant), `from?`/`to?` (datums, default laatste 30 dagen).
+→ echte cijfers uit het grootboek:
+
+```json
+{
+  "range": { "from": "...", "to": "..." },
+  "locations": [ { "id", "name" } ],
+  "summary": { "cards_sold", "active_cards", "cups_outstanding", "cups_redeemed",
+               "revenue_cents", "drink_cost_cents" },
+  "by_location": [ { "id", "name", "cards", "cups_redeemed", "cups_outstanding", "revenue_cents" } ],
+  "by_drink": { "by_type": [ { "type", "label", "sizes": {...}, "total" } ],
+                "by_size": [ { "size", "label", "count" } ] },
+  "activity": [ { "date", "count" } ],
+  "customers": { "total", "returning", "one_time", "avg_cups_per_customer" }
+}
+```
 
 ### `POST /api/staff/cards` _(staff)_
 Body: `{ "customer_id", "card_product_id", "payment": { "method": "pin"|"cash" } }`

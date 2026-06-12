@@ -14,9 +14,14 @@ Prepaid koffiekaart — vooruit betaald in **koppen koffie**, verzilverd aan de 
 
 | Klant — kaart + saldo | Klant — roterende QR | Balie — na een scan |
 |---|---|---|
-| ![Klant home](docs/screenshots/customer-home.png) | ![Roterende QR](docs/screenshots/customer-qr.png) | ![Balie redeem](docs/screenshots/balie-redeemed.png) |
+| ![Klant home](docs/screenshots/customer-home.png) | ![Roterende QR](docs/screenshots/customer-qr.png) | ![Balie redeem](docs/screenshots/balie-redeemed-drink.png) |
 
-Meer in [`docs/screenshots/`](docs/screenshots) (registratie, balie-scanscherm, nieuwe-kaart-flow).
+**Merchant-dashboard** (fase 3) — echte cijfers uit het grootboek, per vestiging en drankje:
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+Meer in [`docs/screenshots/`](docs/screenshots) (registratie, balie-scanscherm met drank-keuze,
+nieuwe-kaart-flow).
 
 ## Lokale setup (Docker / Laravel Sail)
 
