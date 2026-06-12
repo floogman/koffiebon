@@ -31,6 +31,28 @@ Log van bewuste keuzes tijdens de bouw. Zie `CLAUDE.md` voor de opdracht/spec.
 - **`reverb`-programma uit `docker/8.3/supervisord.conf` verwijderd** (KlusApp gebruikt Reverb, wij niet in
   fase 1). Geldt bij de volgende image-rebuild.
 
+## Datamodel & domein (fase 1)
+
+- **Pest** als testframework (brief noemt Pest óf PHPUnit; Pest gekozen voor leesbare flow-tests).
+  `RefreshDatabase` staat aan voor Feature-tests. Tests draaien op SQLite `:memory:`.
+- **`cost_per_cup_cents` toegevoegd aan `card_products`** (default 0). Niet expliciet in §3, maar
+  acceptatiecriterium 6 en de marge-formule (§1) hebben de kostprijs per kop nodig.
+- **`card_events` / `qr_tokens` hebben alleen `created_at`** (onveranderlijk grootboek resp.
+  kortlevend token) via `const UPDATED_AT = null`.
+- **`qr_tokens.subject_type` is een string-enum (`customer|card`)**, geen polymorfe morph-class —
+  bewust simpel; de twee subject-types zijn bekend en vast.
+- **Atomaire verzilvering zonder row locks.** SQLite kent geen `SELECT … FOR UPDATE`. De
+  `RedemptionService` gebruikt daarom een **conditionele UPDATE**
+  (`WHERE status=active AND cups_remaining > 0 … SET cups_remaining = cups_remaining - 1`) en
+  controleert de affected rows. Dat garandeert nooit < 0 of > totaal, ook bij gelijktijdige scans,
+  en is portable naar Postgres. De parallel-test simuleert de race door meer verzilveringen aan te
+  bieden dan er koppen zijn.
+- **`cups_remaining` is een cache**; het grootboek (`card_events`) is leidend. Een tinker-check
+  bevestigt `cups_total + som(redeem-delta's) == cups_remaining`.
+- **Sanctum op zowel `StaffUser` als `Customer`** (beide `HasApiTokens`). Customer is passwordless
+  (alleen device-tokens); StaffUser heeft e-mail+wachtwoord en een rol.
+- **Modellen volgen de Laravel-13 attribuut-stijl** (`#[Fillable]`/`#[Hidden]`) zoals de scaffold-`User`.
+
 ## Werkwijze
 
 - **Alle php/artisan/composer/npm/npx-commando's draaien in de container** via `./vendor/bin/sail …`,
