@@ -53,6 +53,25 @@ Log van bewuste keuzes tijdens de bouw. Zie `CLAUDE.md` voor de opdracht/spec.
   (alleen device-tokens); StaffUser heeft e-mail+wachtwoord en een rol.
 - **Modellen volgen de Laravel-13 attribuut-stijl** (`#[Fillable]`/`#[Hidden]`) zoals de scaffold-`User`.
 
+## Frontend (fase 1)
+
+- **Eén Vite-app, twee oppervlakken via React Router**: klant op `/`, balie op `/balie`, gedeelde
+  code in `src/shared`. Eenvoudiger dan twee builds; same-origin in productie.
+- **Tailwind v3** (stabiel) met het koffie-palet uit de pitch (`espresso/cream/caramel`).
+- **State**: TanStack Query voor server-state; de klant-home polt (3–10s) zodat het saldo live daalt
+  zodra de balie scant. Tokens in `localStorage` (aparte sleutels voor klant-device vs staff).
+- **QR**: `qrcode.react` rendert de deeplink `{FRONTEND_URL}/s/{nonce}`; de balie leest met
+  `@zxing/browser` (camera) of een **keyboard-wedge** hardware-scanner (globale keydown-buffer,
+  submit op Enter). `extractNonce()` accepteert zowel de deeplink als een kale nonce.
+- **PWA**: `vite-plugin-pwa`/Workbox; API-routes uit de precache/navigatie-fallback gehouden
+  (QR/saldo vereisen netwerk → expliciete offline-staat).
+- **Icons** gegenereerd uit `favicon.svg` via headless Chrome (geen extra build-tooling).
+- **Dev-proxy**: Vite proxyt `/api` → `http://localhost:80` (Laravel in dezelfde container), zodat
+  bearer-tokens same-origin werken zonder CORS-config in dev.
+- **Bundle** ~694 KB (ongesplitst; `@zxing` is groot). Acceptabel voor fase 1; later code-splitten.
+- **Verificatie** van de UI via Chrome DevTools Protocol (Node 23, geen extra deps) — screenshots
+  in `docs/screenshots/`.
+
 ## Werkwijze
 
 - **Alle php/artisan/composer/npm/npx-commando's draaien in de container** via `./vendor/bin/sail …`,

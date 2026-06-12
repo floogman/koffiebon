@@ -64,8 +64,28 @@ Zie de Definition of Done in `CLAUDE.md` §11.
       (409 `token_consumed`); register → queue → Mailpit → verify → claim → `/pwa/me`.
 - [x] `README.md` (setup + demo-credentials) en `API.md` geschreven.
 
-### Nog te doen in fase 1
+### Frontend — klant-PWA + balie-app (af)
 
-- [ ] Klant-PWA (React/Vite): installeerbaar, kaarten + roterende QR + herstel.
-- [ ] Balie-app (React/Vite): camera-scan (`@zxing/browser`) + hardware-scanner (keyboard-wedge),
-      activeren en afboeken.
+- [x] **Vite-workspace** `frontend/` (React 18 + TS + Tailwind, koffie-palet), draait in de container;
+      dev-server proxyt `/api` → Laravel (same-origin, bearer-tokens).
+- [x] **PWA**: `vite-plugin-pwa` (Workbox) — manifest "Koffiebon", espresso `theme_color`,
+      `display: standalone`, service worker, gegenereerde icons (192/512/maskable + apple-touch).
+      API-calls worden nooit gecachet (QR/saldo vereisen netwerk).
+- [x] **Klant-PWA** (`/`): passwordless registratie + herstel, claim-landing (`/claim`),
+      kaartlijst met saldo + voortgangsbalk, **roterende redeem-QR** met aflopende teller
+      (auto-refresh ~30s + bij focus), identify-QR voor een nieuwe kaart, offline-staat.
+- [x] **Balie-app** (`/balie`): staff-login, **camera-scan** (`@zxing/browser`) **én
+      hardware-scanner** (keyboard-wedge), plus handmatige invoer. Identify → product + betaling +
+      activeren; redeem → groot "Geschonken! nog N". Nette foutmeldingen (verlopen/gebruikt/leeg).
+- [x] **Build groen**: `npm run build` (tsc + vite) compileert zonder fouten; SW + manifest gegenereerd.
+- [x] **Live geverifieerd in de browser** (Chrome via CDP, screenshots in `docs/screenshots/`):
+      klant-home (8/12), roterende QR (live, teller), balie-scan → redeem (8→7), nieuwe-kaart-flow
+      (€30,00 + pin/contant), registratiescherm.
+
+> **Fase 1 DoD gehaald**: verse checkout via `README` opstartbaar; flow A→D werkt end-to-end
+> (API-tests + live HTTP + live in de PWA/balie-UI).
+
+### Volgende fases
+
+- **Fase 2** — Mollie achter `PaymentProvider`, kaart cadeau doen.
+- **Fase 3** — merchant-dashboard, meerdere producten/vestigingen.

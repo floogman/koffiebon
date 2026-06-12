@@ -4,9 +4,19 @@ Prepaid koffiekaart — vooruit betaald in **koppen koffie**, verzilverd aan de 
 **roterende, eenmalige QR-code**. De server is de bron van waarheid voor het saldo; de QR is "dom".
 
 - **Backend:** Laravel 13 (API-only), Sanctum, Pest. Geld in hele centen, tijdzone `Europe/Amsterdam`.
-- **Frontend (volgt):** React + Vite PWA (klant) + balie-app.
+- **Frontend:** React 18 + TypeScript + Vite PWA in [`/frontend`](frontend) — klant-PWA (`/`) en
+  balie-app (`/balie`), één codebase, Tailwind met het koffie-palet, TanStack Query, `qrcode.react`,
+  `@zxing/browser` + hardware-scanner.
 - Zie [`CLAUDE.md`](CLAUDE.md) voor de volledige opdracht/spec, [`API.md`](API.md) voor de endpoints,
   en [`DECISIONS.md`](DECISIONS.md) / [`PROGRESS.md`](PROGRESS.md) voor keuzes en voortgang.
+
+## Screenshots
+
+| Klant — kaart + saldo | Klant — roterende QR | Balie — na een scan |
+|---|---|---|
+| ![Klant home](docs/screenshots/customer-home.png) | ![Roterende QR](docs/screenshots/customer-qr.png) | ![Balie redeem](docs/screenshots/balie-redeemed.png) |
+
+Meer in [`docs/screenshots/`](docs/screenshots) (registratie, balie-scanscherm, nieuwe-kaart-flow).
 
 ## Lokale setup (Docker / Laravel Sail)
 
@@ -39,6 +49,21 @@ versturen; ze landen in **Mailpit**:
 ```bash
 ./vendor/bin/sail artisan queue:work
 ```
+
+### Frontend (Vite PWA)
+
+De React-app staat in `frontend/` en draait **in de container** (Node 20). De dev-server proxyt
+`/api` naar de Laravel-app, dus alles is same-origin met bearer-tokens.
+
+```bash
+docker exec -w /var/www/html/frontend koffiebon-laravel.bon-1 npm install
+docker exec -d -w /var/www/html/frontend koffiebon-laravel.bon-1 npm run dev
+# Productiebuild: npm run build  (genereert dist/ + service worker + manifest)
+```
+
+De PWA draait op **http://localhost:5173** (klant op `/`, balie op `/balie`). Zet
+`FRONTEND_URL=http://localhost:5173` in `.env` zodat de e-mailverificatie en de QR-deeplink
+daarheen wijzen.
 
 ## Tests
 

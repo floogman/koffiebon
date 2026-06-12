@@ -28,3 +28,9 @@ Thumbs.db
 /.claude
 /.fleet
 composer.phar
+
+# Frontend (Vite/React)
+/frontend/node_modules
+/frontend/dist
+/frontend/dev-dist
+/frontend/.vite

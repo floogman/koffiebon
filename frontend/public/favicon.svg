@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+    <rect width="512" height="512" rx="112" fill="#1e1410"/>
+    <g transform="translate(0,8)">
+        <!-- steam -->
+        <g stroke="#c5772a" stroke-width="14" stroke-linecap="round" fill="none" opacity="0.85">
+            <path d="M214 150 q-18 -26 0 -52 q18 -26 0 -52"/>
+            <path d="M256 150 q-18 -26 0 -52 q18 -26 0 -52"/>
+            <path d="M298 150 q-18 -26 0 -52 q18 -26 0 -52"/>
+        </g>
+        <!-- cup body -->
+        <path d="M150 196 h180 v66 a90 90 0 0 1 -180 0 z" fill="#f5ece1"/>
+        <!-- coffee surface -->
+        <ellipse cx="240" cy="196" rx="90" ry="20" fill="#3a2a20"/>
+        <!-- handle -->
+        <path d="M330 210 h28 a40 40 0 0 1 0 80 h-20" fill="none" stroke="#f5ece1" stroke-width="22"/>
+        <!-- saucer -->
+        <rect x="130" y="372" width="220" height="22" rx="11" fill="#c5772a"/>
+    </g>
+</svg>
