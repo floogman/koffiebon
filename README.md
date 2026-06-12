@@ -48,12 +48,17 @@ en hoeft niet te starten: `./vendor/bin/sail --profile pgsql up -d` indien gewen
 
 ### E-mail (verificatie / magic-link)
 
-E-mail gaat via de **queue** (database driver). Start een worker om verificatie-/herstelmails te
-versturen; ze landen in **Mailpit**:
+Lokaal staat `QUEUE_CONNECTION=sync`, dus verificatie-/herstelmails worden **direct in-process**
+verstuurd — **geen `queue:work`-worker nodig**. Ze landen in **Mailpit** (http://localhost:8025).
+
+In productie zet je `QUEUE_CONNECTION=database` en draai je een worker:
 
 ```bash
 ./vendor/bin/sail artisan queue:work
 ```
+
+> De ondertekende verificatielink wordt op het **verzendmoment** gegenereerd (TTL 24u), dus ook met
+> een trage queue arriveert hij nooit al verlopen.
 
 ### Frontend (Vite PWA)
 

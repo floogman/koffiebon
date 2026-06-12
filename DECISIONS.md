@@ -35,6 +35,12 @@ Log van bewuste keuzes tijdens de bouw. Zie `CLAUDE.md` voor de opdracht/spec.
 
 - **Pest** als testframework (brief noemt Pest óf PHPUnit; Pest gekozen voor leesbare flow-tests).
   `RefreshDatabase` staat aan voor Feature-tests. Tests draaien op SQLite `:memory:`.
+- **Queue lokaal = `sync` (afwijking van de brief).** De brief noemt de database-driver + e-mail via
+  queue; dat blijft de **productie**-default (`.env.example` documenteert `database` + `queue:work`).
+  Lokaal draaien we `sync` zodat e-mail direct in-process verstuurt — geen worker nodig en de
+  verificatielink kan niet door queue-vertraging verlopen aankomen. De mailables blijven `ShouldQueue`
+  (correct voor productie); de ondertekende link wordt op het **verzendmoment** in `CustomerLinkMail`
+  gegenereerd (TTL 24u), niet bij het in de wachtrij zetten.
 - **`cost_per_cup_cents` toegevoegd aan `card_products`** (default 0). Niet expliciet in §3, maar
   acceptatiecriterium 6 en de marge-formule (§1) hebben de kostprijs per kop nodig.
 - **`card_events` / `qr_tokens` hebben alleen `created_at`** (onveranderlijk grootboek resp.
