@@ -1,0 +1,18 @@
+# Koffiebon — queue-worker (verzendt o.a. verificatie-/magic-link-mails)
+#   sudo cp deploy/systemd/koffiebon-queue.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now koffiebon-queue
+[Unit]
+Description=Koffiebon queue worker
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/koffiebon
+ExecStart=/usr/bin/php /var/www/koffiebon/artisan queue:work --sleep=3 --tries=3 --max-time=3600
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
