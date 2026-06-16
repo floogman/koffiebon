@@ -96,3 +96,80 @@ Log van bewuste keuzes tijdens de bouw. Zie `CLAUDE.md` voor de opdracht/spec.
 - **Alle php/artisan/composer/npm/npx-commando's draaien in de container** via `./vendor/bin/sail …`,
   nooit op de host (host = PHP 8.4, container = 8.3).
 - Git geïnitialiseerd in de projectroot. `pitch/` (de pitch deck) blijft ongemoeid.
+
+## 6-cijferige baliecode naast de QR
+
+- Elke QR-token krijgt naast de nonce een **6-cijferige code** (100000–999999, nooit een
+  voorloopnul) die de balie met de hand kan intypen. Code en nonce horen bij hetzelfde token-record
+  en delen één `expires_at`; één scan óf code consumeert het token (single-use).
+- Alleen de **hash** van de code wordt opgeslagen (`qr_tokens.code_hash`), net als de nonce. De platte
+  code verlaat de server precies één keer (bij uitgifte) en staat boven de QR in de klant-PWA.
+- De TTL is verhoogd van 45s → **60s** (`QR_TOKEN_TTL`), zodat de korte code prettig in te typen blijft.
+- **Afweging:** een 6-cijferige code is veel makkelijker te raden dan de 128-bit nonce (~900k ruimte).
+  Aanvaardbaar omdat het token single-use is, 60s leeft, scannen alleen kan met een geauthenticeerde
+  staff-token, en `POST /staff/scan` op 120/min gethrottled is (≈120 pogingen per levensduur).
+- `consume()` matcht op `nonce_hash` **of** `code_hash`; de balie-frontend stuurt beide via hetzelfde
+  `nonce`-veld (een kale code passeert `extractNonce` ongewijzigd).
+
+## Live-updates via Laravel Reverb
+
+- De klant-PWA krijgt **realtime** kaart-updates via **Laravel Reverb** (WebSockets, pusher-protocol)
+  i.p.v. alleen polling. Eén event `App\Events\CardUpdated` (`action`: redeemed/activated/issued) gaat
+  over privé-kanaal **`Customer.{id}`**; de PWA ververst het `['me']`-saldo en toont een bevestiging.
+- **Kanaal-auth met bearer-tokens:** de PWA gebruikt Sanctum-bearer-tokens, niet de standaard
+  cookie-sessie. Daarom een eigen endpoint `POST /api/broadcasting/auth` onder `auth:sanctum`
+  (`abilities:customer`); Laravel-Echo wijst zijn `authEndpoint` daarheen met de `Authorization`-header.
+  De default `/broadcasting/auth` (web/cookies) blijft ongebruikt.
+- **Best-effort broadcasten:** events worden ná de DB-commit verstuurd en in een `try/catch`
+  (trait `BroadcastsCardUpdates`) ingepakt — een onbereikbare Reverb-server mag verzilveren/activeren
+  nooit laten falen. De PWA houdt polling als vangnet (lichter: 5s open / 20s dicht).
+- **Infra:** Reverb draait in de bestaande `laravel.bon`-container op poort **8080** (toegevoegd aan
+  `docker-compose.yml` en de `composer dev`-concurrently). `BROADCAST_CONNECTION=reverb`. Tests draaien
+  met `BROADCAST_CONNECTION=null` (geen socket).
+- **Frontend-env:** `vite.config.ts` leest nu de root-`.env` (`envDir: ..`) zodat de `VITE_REVERB_*`-
+  variabelen in de build belanden. `laravel-echo` + `pusher-js` toegevoegd.
+- **Afweging:** de QR-overlay toont het saldo nu uit de verse `['me']`-query (op `card_id`) i.p.v. een
+  snapshot, zodat het getal live meeloopt met zowel de push als de refetch.
+
+## Vast voorkeursdrankje per kaart
+
+- Een kaart is voor **één vast drankje** (koffiesoort + maat). De klant kiest dit **vooraf in de PWA**
+  bij het kopen; het staat naast zowel de koop-QR als de bestel-QR.
+- **Als tekst opgeslagen, geen FK** naar `drinks`: `cards.preferred_coffee_type` + `cards.preferred_cup_size`
+  (enums `CoffeeType`/`CupSize`, cast op het model; `preferredDrinkLabel()` → "Cappuccino · Medium").
+  Zo blijft de keuze leesbaar ook als de drankenkaart later wijzigt.
+- **Doorgeefroute (keuze → nieuwe kaart):** de identify-token draagt de gekozen drank mee
+  (`qr_tokens.preferred_coffee_type/size`). Bij de scan geeft de server het door in de identify-respons;
+  de balie stuurt het mee naar `POST /staff/cards`, dat het op de kaart vastlegt. De balie kiest dus niet.
+- **Beslissingen (met de gebruiker afgestemd):** keuze **verplicht** (geen kaart zonder drank), **vast bij
+  aankoop** (geen wijzig-endpoint), en de **klant** kiest (niet de balie).
+- **Klant-drankenkaart:** nieuwe `GET /api/pwa/drinks` (alle actieve drinks; single-merchant MVP — bij
+  multi-merchant scopen op de merchant van de vestiging/kaart).
+- **Frontend:** `DrinkPicker` verplaatst naar `src/shared/` en hergebruikt door balie én klant-PWA. De
+  koop-overlay selecteert standaard de eerste drank en geeft de keuze door aan de QR (token hernieuwt bij
+  wijziging); de bestel-overlay toont het vaste drankje van de kaart.
+
+## Balie kiest geen drankje meer bij het scannen
+
+- De "Wat schenk je?"-picker is uit de balie-scanpagina verwijderd. Wat geschonken wordt staat **vast op
+  de kaart** (het voorkeursdrankje); de balie scant alleen. `POST /staff/scan` accepteert geen `drink_id`
+  meer.
+- Bij verzilveren legt het redeem-event nu `coffee_type`/`cup_size` vast vanuit de **kaart** (tekst), en
+  zoekt de server de bijbehorende drink-rij van de merchant op voor de **kostprijs**/`drink_id` (kan
+  `null` zijn als de drankenkaart sinds aankoop wijzigde). De balie-bevestiging toont
+  `card.preferred_drink_label`.
+- `DrinkPicker` blijft bestaan in `src/shared/` (alleen nog gebruikt door de klant-PWA bij het kopen).
+  `GET /staff/drinks` blijft als beheer-/overzichtsendpoint, maar wordt niet meer in de scanflow gebruikt.
+
+## Productie-deploy (VPS, koffie.klusviewer.nl)
+
+- **Native PHP-FPM** (geen Docker op de VPS), **SQLite** als productie-database, **nginx +
+  Let's Encrypt** (certbot auto-renew), Reverb en queue-worker via **systemd**. Reden: sluit aan
+  op de bestaande nginx/certbot-setup van klusviewer.nl en houdt het goedkoop/simpel.
+- **De PWA bezit de root** van het subdomein; nginx serveert de statische Vite-build en stuurt
+  alleen `/api` → PHP-FPM en `/app` + `/apps` → Reverb (127.0.0.1:8080) door. Gevolg: de
+  server-rendered café-site (`SiteController` `/`, `/menu`) is op dit subdomein niet bereikbaar —
+  desgewenst later op een eigen (sub)domein zetten.
+- `FRONTEND_URL` = `https://koffie.klusviewer.nl` zodat de QR-deeplinks (`/s/{nonce}`) en de
+  claim-link naar de PWA op hetzelfde subdomein wijzen; de PWA praat same-origin met `/api`.
+- Alle artefacten staan in [`deploy/`](deploy); volledige handleiding in [`DEPLOY.md`](DEPLOY.md).
