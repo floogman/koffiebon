@@ -65,10 +65,10 @@ ssh -T koffiebon-github
 
 ```bash
 # 2d. Clonen via de alias
-sudo mkdir -p /var/www/koffiebon
-sudo chown -R $USER:www-data /var/www/koffiebon
-git clone koffiebon-github:floogman/koffiebon.git /var/www/koffiebon
-cd /var/www/koffiebon
+sudo mkdir -p /var/www/koffie.klusviewer.nl
+sudo chown -R $USER:www-data /var/www/koffie.klusviewer.nl
+git clone koffiebon-github:floogman/koffiebon.git /var/www/koffie.klusviewer.nl
+cd /var/www/koffie.klusviewer.nl
 git checkout setup/laravel-sail-scaffold     # of main, afhankelijk van je deploy-branch
 ```
 
@@ -100,15 +100,25 @@ sudo chmod -R ug+rw storage bootstrap/cache database
 
 ## 5. Eerste install (backend + frontend)
 
+De seeder gebruikt factories met `fake()`, en `fakerphp/faker` zit in **`require-dev`**. Installeer
+daarom voor de **eenmalige** seed mét dev-deps, en sla daarna af naar productie:
+
 ```bash
-composer install --no-dev --optimize-autoloader
+# Backend — eerst MET dev-deps zodat de seed (faker) werkt
+composer install
 php artisan migrate --force
-php artisan db:seed --force      # alleen de eerste keer: demo-merchant/staff/product/klant
+php artisan db:seed --force                        # alleen de eerste keer: demo-merchant/staff/product/klant
+composer install --no-dev --optimize-autoloader    # daarna afslanken naar productie
 
-( cd frontend && npm ci && npm run build )   # genereert frontend/dist + service worker
+# Frontend build (genereert frontend/dist + service worker)
+( cd frontend && npm ci && npm run build )
 
-php artisan optimize             # config/route/view-cache
+# Caches
+php artisan optimize                               # config/route/view-cache
 ```
+
+> Latere deploys (`deploy/deploy.sh`) draaien **geen** `db:seed` en hebben faker niet nodig;
+> daar volstaat `composer install --no-dev`.
 
 ## 6. systemd-services (Reverb + queue)
 
@@ -123,7 +133,7 @@ sudo systemctl status koffiebon-reverb koffiebon-queue --no-pager
 ## 7. nginx (HTTP eerst)
 
 ```bash
-sudo ln -s /var/www/koffiebon/deploy/nginx/koffie.klusviewer.nl.conf \
+sudo ln -s /var/www/koffie.klusviewer.nl/deploy/nginx/koffie.klusviewer.nl.conf \
            /etc/nginx/sites-enabled/koffie.klusviewer.nl.conf
 sudo nginx -t
 sudo systemctl reload nginx
@@ -192,7 +202,7 @@ die termineert geen TLS zelf — dat doet nginx.
 Na een nieuwe commit op de VPS gewoon:
 
 ```bash
-cd /var/www/koffiebon
+cd /var/www/koffie.klusviewer.nl
 ./deploy/deploy.sh
 ```
 

@@ -9,8 +9,8 @@ After=network.target
 Type=simple
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/koffiebon
-ExecStart=/usr/bin/php /var/www/koffiebon/artisan reverb:start --host=127.0.0.1 --port=8081
+WorkingDirectory=/var/www/koffie.klusviewer.nl
+ExecStart=/usr/bin/php /var/www/koffie.klusviewer.nl/artisan reverb:start --host=127.0.0.1 --port=8081
 Restart=always
 RestartSec=3
 

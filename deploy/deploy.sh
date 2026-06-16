@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Koffiebon — deploy/update op de VPS. Draai als de eigenaar van /var/www/koffiebon.
-#   cd /var/www/koffiebon && ./deploy/deploy.sh
+# Koffiebon — deploy/update op de VPS. Draai als de eigenaar van /var/www/koffie.klusviewer.nl.
+#   cd /var/www/koffie.klusviewer.nl && ./deploy/deploy.sh
 set -euo pipefail
 
 cd "$(dirname "$0")/.."   # repo-root

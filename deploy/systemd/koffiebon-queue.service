@@ -9,8 +9,8 @@ After=network.target
 Type=simple
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/koffiebon
-ExecStart=/usr/bin/php /var/www/koffiebon/artisan queue:work --sleep=3 --tries=3 --max-time=3600
+WorkingDirectory=/var/www/koffie.klusviewer.nl
+ExecStart=/usr/bin/php /var/www/koffie.klusviewer.nl/artisan queue:work --sleep=3 --tries=3 --max-time=3600
 Restart=always
 RestartSec=3
 
