@@ -5,7 +5,7 @@ import { Banner, Logo, Screen } from '@shared/ui'
 
 export default function AuthPage() {
     const [email, setEmail] = useState('')
-    const [mode, setMode] = useState<'register' | 'recover'>('register')
+    const [mode, setMode] = useState<'register' | 'login'>('register')
     const [sent, setSent] = useState(false)
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -47,12 +47,12 @@ export default function AuthPage() {
                 ) : (
                     <form onSubmit={submit} className="flex flex-col gap-4">
                         <h1 className="text-xl font-bold">
-                            {mode === 'register' ? 'Aan de slag' : 'Kaart kwijt? Herstel via e-mail'}
+                            {mode === 'register' ? 'Aan de slag' : 'Inloggen met je e-mail'}
                         </h1>
                         <p className="text-sm text-muted">
                             {mode === 'register'
                                 ? 'Vul je e-mailadres in. Je bevestigt het via een link — geen wachtwoord nodig.'
-                                : 'We sturen een herstellink. Je kaarten en saldi staan veilig op de server.'}
+                                : 'Vul je e-mailadres in. We sturen je een inloglink — geen wachtwoord nodig. Je kaarten en saldi staan veilig op de server.'}
                         </p>
 
                         <input
@@ -69,15 +69,15 @@ export default function AuthPage() {
                         {error && <Banner kind="error">{error}</Banner>}
 
                         <button className="btn-primary" disabled={busy}>
-                            {busy ? 'Versturen…' : mode === 'register' ? 'Verstuur bevestiging' : 'Verstuur herstellink'}
+                            {busy ? 'Versturen…' : mode === 'register' ? 'Verstuur bevestiging' : 'Verstuur inloglink'}
                         </button>
 
                         <button
                             type="button"
                             className="text-sm text-caramel underline"
-                            onClick={() => setMode(mode === 'register' ? 'recover' : 'register')}
+                            onClick={() => setMode(mode === 'register' ? 'login' : 'register')}
                         >
-                            {mode === 'register' ? 'Kaart kwijt? Herstel via e-mail' : 'Terug naar registreren'}
+                            {mode === 'register' ? 'Al een account? Inloggen met e-mail' : 'Nieuw hier? Registreren'}
                         </button>
                     </form>
                 )}

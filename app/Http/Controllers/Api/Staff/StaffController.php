@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\Staff;
 
 use App\Enums\CardStatus;
+use App\Enums\CoffeeType;
+use App\Enums\CupSize;
 use App\Enums\PaymentMethod;
 use App\Enums\QrPurpose;
 use App\Enums\QrSubjectType;
@@ -20,6 +22,7 @@ use App\Services\QrTokenService;
 use App\Services\RedemptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class StaffController extends Controller
 {
@@ -58,7 +61,6 @@ class StaffController extends Controller
     {
         $data = $request->validate([
             'nonce' => ['required', 'string'],
-            'drink_id' => ['nullable', 'integer'],
         ]);
         $staff = $request->user();
 
@@ -76,6 +78,12 @@ class StaffController extends Controller
                 'type' => 'identify',
                 'customer' => new CustomerResource($customer),
                 'products' => CardProductResource::collection($products),
+                // Het in de PWA gekozen vaste drankje; de balie legt dit op de nieuwe kaart vast.
+                'preferred_drink' => $token->preferred_coffee_type ? [
+                    'type' => $token->preferred_coffee_type->value,
+                    'size' => $token->preferred_cup_size->value,
+                    'label' => $token->preferred_coffee_type->label().' · '.$token->preferred_cup_size->label(),
+                ] : null,
             ]);
         }
 
@@ -91,11 +99,14 @@ class StaffController extends Controller
             ], 409);
         }
 
-        // Optioneel: het geschonken drankje (type/maat) voor analytics; moet bij de merchant horen.
-        $drink = null;
-        if (! empty($data['drink_id'])) {
-            $drink = Drink::where('merchant_id', $staff->merchant_id)->find($data['drink_id']);
-        }
+        // Het geschonken drankje staat vast op de kaart; zoek de bijbehorende drink-rij
+        // (voor kostprijs/analytics). Kan ontbreken als de drankenkaart later wijzigde.
+        $drink = ($card->preferred_coffee_type && $card->preferred_cup_size)
+            ? Drink::where('merchant_id', $staff->merchant_id)
+                ->where('type', $card->preferred_coffee_type->value)
+                ->where('size', $card->preferred_cup_size->value)
+                ->first()
+            : null;
 
         $card = $this->redemption->redeemCup($card, $staff, $drink);
 
@@ -118,6 +129,9 @@ class StaffController extends Controller
             'customer_id' => ['required', 'integer', 'exists:customers,id'],
             'card_product_id' => ['required', 'integer'],
             'payment.method' => ['required', 'in:cash,pin'],
+            // Het door de klant gekozen vaste drankje (komt mee uit de identify-scan).
+            'preferred_coffee_type' => ['required', Rule::enum(CoffeeType::class)],
+            'preferred_cup_size' => ['required', Rule::enum(CupSize::class)],
         ]);
 
         $staff = $request->user();
@@ -129,6 +143,8 @@ class StaffController extends Controller
             $customer,
             $product,
             PaymentMethod::from($data['payment']['method']),
+            CoffeeType::from($data['preferred_coffee_type']),
+            CupSize::from($data['preferred_cup_size']),
             $staff,
             $staff->location,
         );

@@ -22,8 +22,9 @@ class QrTokenFactory extends Factory
             'subject_type' => QrSubjectType::Card,
             'subject_id' => Card::factory(),
             'nonce_hash' => hash('sha256', Str::random(40)),
+            'code_hash' => hash('sha256', (string) $this->faker->numberBetween(100000, 999999)),
             'purpose' => QrPurpose::Redeem,
-            'expires_at' => now()->addSeconds(45),
+            'expires_at' => now()->addSeconds(60),
             'consumed_at' => null,
         ];
     }

@@ -35,7 +35,7 @@ class CustomerAuthController extends Controller
         $this->auth->sendMagicLink($data['email']);
 
         return response()->json([
-            'message' => 'Als dit e-mailadres bekend is, sturen we een herstellink.',
+            'message' => 'Als dit e-mailadres bekend is, sturen we een inloglink.',
         ], 202);
     }
 

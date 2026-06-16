@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Card, CardProduct, Customer } from '@shared/types'
+import type { Card, CardProduct, Customer, DrinkChoice } from '@shared/types'
 import { euro, staffApi } from '@shared/clients'
 import { isApiError } from '@shared/api'
 import { Banner } from '@shared/ui'
@@ -10,10 +10,12 @@ type Method = 'pin' | 'cash'
 export default function NewCardFlow({
     customer,
     products,
+    preferredDrink,
     onDone,
 }: {
     customer: Customer
     products: CardProduct[]
+    preferredDrink: DrinkChoice | null
     onDone: (card: Card) => void
 }) {
     const [productId, setProductId] = useState<number | null>(products[0]?.id ?? null)
@@ -25,11 +27,14 @@ export default function NewCardFlow({
     const priceCents = product ? product.cups_paid * product.price_per_cup_cents : 0
 
     const confirm = async () => {
-        if (!productId) return
+        if (!productId || !preferredDrink) return
         setBusy(true)
         setError(null)
         try {
-            const { card } = await staffApi.createCard(customer.id, productId, method)
+            const { card } = await staffApi.createCard(customer.id, productId, method, {
+                type: preferredDrink.type,
+                size: preferredDrink.size,
+            })
             onDone(card)
         } catch (e) {
             setError(isApiError(e) ? e.message : 'Kon de kaart niet aanmaken.')
@@ -45,6 +50,17 @@ export default function NewCardFlow({
                 <div className="text-lg font-bold">{customer.email}</div>
                 {!customer.email_verified && (
                     <Banner kind="error">Deze klant heeft nog geen geverifieerd e-mailadres.</Banner>
+                )}
+            </div>
+
+            <div className="rounded-xl bg-espresso/5 px-4 py-3">
+                <div className="text-sm font-semibold text-muted">Vast drankje van de kaart</div>
+                {preferredDrink ? (
+                    <div className="text-lg font-bold">☕ {preferredDrink.label}</div>
+                ) : (
+                    <Banner kind="error">
+                        Geen drankje meegekomen met de QR. Laat de klant een nieuwe QR tonen.
+                    </Banner>
                 )}
             </div>
 
@@ -90,7 +106,7 @@ export default function NewCardFlow({
 
             <button
                 className="btn-primary w-full"
-                disabled={busy || !productId || !customer.email_verified}
+                disabled={busy || !productId || !preferredDrink || !customer.email_verified}
                 onClick={confirm}
             >
                 {busy ? 'Aanmaken…' : `${euro(priceCents, product?.currency)} ontvangen — kaart activeren`}

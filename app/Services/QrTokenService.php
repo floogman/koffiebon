@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Enums\CoffeeType;
+use App\Enums\CupSize;
 use App\Enums\QrPurpose;
 use App\Enums\QrSubjectType;
 use App\Exceptions\TokenException;
@@ -20,30 +22,57 @@ use Illuminate\Support\Facades\DB;
 class QrTokenService
 {
     /**
-     * Geef een token uit voor een subject. Retourneert de platte nonce (eenmalig)
-     * plus het opgeslagen token-record.
+     * Geef een token uit voor een subject. Retourneert de platte nonce én de
+     * 6-cijferige baliecode (beide eenmalig) plus het opgeslagen token-record.
      *
-     * @return array{nonce: string, token: QrToken}
+     * @return array{nonce: string, code: string, token: QrToken}
      */
-    public function issue(QrSubjectType $subjectType, int $subjectId, QrPurpose $purpose): array
-    {
+    public function issue(
+        QrSubjectType $subjectType,
+        int $subjectId,
+        QrPurpose $purpose,
+        ?CoffeeType $coffeeType = null,
+        ?CupSize $cupSize = null,
+    ): array {
         // >= 128 bit cryptografische willekeur.
         $nonce = bin2hex(random_bytes(16));
+        $code = $this->uniqueCode();
 
         $token = QrToken::create([
             'subject_type' => $subjectType,
             'subject_id' => $subjectId,
             'nonce_hash' => hash('sha256', $nonce),
+            'code_hash' => hash('sha256', $code),
             'purpose' => $purpose,
+            'preferred_coffee_type' => $coffeeType,
+            'preferred_cup_size' => $cupSize,
             'expires_at' => now()->addSeconds(config('koffiebon.qr_token_ttl')),
         ]);
 
-        return ['nonce' => $nonce, 'token' => $token];
+        return ['nonce' => $nonce, 'code' => $code, 'token' => $token];
     }
 
-    public function issueForCustomer(Customer $customer): array
+    /**
+     * Genereer een 6-cijferige code (100000–999999, dus nooit met voorloopnul) die
+     * op dit moment niet door een ander nog-bruikbaar token in gebruik is.
+     */
+    private function uniqueCode(): string
     {
-        return $this->issue(QrSubjectType::Customer, $customer->getKey(), QrPurpose::Identify);
+        do {
+            $code = (string) random_int(100000, 999999);
+            $taken = QrToken::query()
+                ->where('code_hash', hash('sha256', $code))
+                ->where('expires_at', '>', now())
+                ->whereNull('consumed_at')
+                ->exists();
+        } while ($taken);
+
+        return $code;
+    }
+
+    public function issueForCustomer(Customer $customer, CoffeeType $coffeeType, CupSize $cupSize): array
+    {
+        return $this->issue(QrSubjectType::Customer, $customer->getKey(), QrPurpose::Identify, $coffeeType, $cupSize);
     }
 
     public function issueForCard(Card $card): array
@@ -52,17 +81,18 @@ class QrTokenService
     }
 
     /**
-     * Consumeer een token op basis van de platte nonce. Atomair en single-use.
+     * Consumeer een token op basis van de platte nonce óf de 6-cijferige baliecode.
+     * Atomair en single-use.
      *
      * @throws TokenException als de token onbekend, verlopen of al gebruikt is.
      */
-    public function consume(string $nonce): QrToken
+    public function consume(string $nonceOrCode): QrToken
     {
-        $hash = hash('sha256', $nonce);
+        $hash = hash('sha256', $nonceOrCode);
 
         return DB::transaction(function () use ($hash) {
             $token = QrToken::query()
-                ->where('nonce_hash', $hash)
+                ->where(fn ($q) => $q->where('nonce_hash', $hash)->orWhere('code_hash', $hash))
                 ->lockForUpdate()
                 ->first();
 

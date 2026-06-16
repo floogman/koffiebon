@@ -12,8 +12,8 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\URL;
 
 /**
- * E-mail met een ondertekende verificatie-/herstellink naar de PWA.
- * Wordt gebruikt voor zowel eerste registratie als magic-link-herstel.
+ * E-mail met een ondertekende verificatie-/inloglink naar de PWA.
+ * Wordt gebruikt voor zowel eerste registratie als het inloggen met je e-mailadres.
  *
  * De ondertekende link wordt op het VERZENDMOMENT gegenereerd (in content()),
  * niet bij het in de wachtrij zetten. Zo begint de TTL pas te lopen wanneer de
@@ -25,14 +25,14 @@ class CustomerLinkMail extends Mailable implements ShouldQueue
 
     public function __construct(
         public Customer $customer,
-        public bool $isRecovery = false,
+        public bool $isLogin = false,
     ) {}
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: $this->isRecovery
-                ? 'Je Koffiebon-kaarten herstellen'
+            subject: $this->isLogin
+                ? 'Je Koffiebon-inloglink'
                 : 'Bevestig je e-mailadres voor Koffiebon',
         );
     }
@@ -49,7 +49,7 @@ class CustomerLinkMail extends Mailable implements ShouldQueue
             view: 'mail.customer-link',
             with: [
                 'url' => $url,
-                'isRecovery' => $this->isRecovery,
+                'isLogin' => $this->isLogin,
             ],
         );
     }

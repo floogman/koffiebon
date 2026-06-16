@@ -33,6 +33,8 @@ export default defineConfig({
             },
         }),
     ],
+    // De VITE_*-variabelen (o.a. Reverb) staan in de root-.env naast de Laravel-app.
+    envDir: path.resolve(__dirname, '..'),
     resolve: {
         alias: { '@shared': path.resolve(__dirname, 'src/shared') },
     },

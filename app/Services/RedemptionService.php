@@ -8,6 +8,7 @@ use App\Exceptions\RedemptionException;
 use App\Models\Card;
 use App\Models\Drink;
 use App\Models\StaffUser;
+use App\Services\Concerns\BroadcastsCardUpdates;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -18,6 +19,8 @@ use Illuminate\Support\Facades\DB;
  */
 class RedemptionService
 {
+    use BroadcastsCardUpdates;
+
     /**
      * Verzilver precies één kop van een kaart.
      *
@@ -25,7 +28,7 @@ class RedemptionService
      */
     public function redeemCup(Card $card, ?StaffUser $staff = null, ?Drink $drink = null): Card
     {
-        return DB::transaction(function () use ($card, $staff, $drink) {
+        $card = DB::transaction(function () use ($card, $staff, $drink) {
             // Atomaire, conditionele decrement. Slaagt voor hooguit één gelijktijdige scan.
             $affected = Card::query()
                 ->whereKey($card->getKey())
@@ -39,14 +42,16 @@ class RedemptionService
 
             $card->refresh();
 
-            // Snapshot van het geschonken drankje (type/maat/kostprijs) voor analytics.
+            // Het geschonken drankje staat vast op de kaart (type/maat als tekst). De
+            // bijpassende drink-rij levert alleen de kostprijs/id voor analytics — die kan
+            // ontbreken als de drankenkaart sinds de aankoop is gewijzigd.
             $card->events()->create([
                 'type' => CardEventType::Redeem,
                 'cups_delta' => -1,
                 'staff_user_id' => $staff?->getKey(),
                 'drink_id' => $drink?->getKey(),
-                'coffee_type' => $drink?->type,
-                'cup_size' => $drink?->size,
+                'coffee_type' => $card->preferred_coffee_type,
+                'cup_size' => $card->preferred_cup_size,
                 'cost_cents' => $drink?->cost_cents,
             ]);
 
@@ -56,5 +61,10 @@ class RedemptionService
 
             return $card;
         });
+
+        // Na commit: stuur het nieuwe saldo live naar de PWA.
+        $this->broadcastCardUpdated($card, 'redeemed');
+
+        return $card;
     }
 }

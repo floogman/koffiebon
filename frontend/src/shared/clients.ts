@@ -12,9 +12,15 @@ export const customerApi = {
     claim: (code: string) =>
         anon.post<{ device_token: string; customer: Customer }>('/auth/claim', { code }),
     me: () => customer.get<Customer>('/pwa/me'),
+    drinks: () => customer.get<{ data: Drink[] }>('/pwa/drinks'),
     card: (id: number) => customer.get<Card>(`/pwa/cards/${id}`),
-    issueToken: (purpose: 'identify' | 'redeem', cardId?: number) =>
-        customer.post<QrToken>('/pwa/tokens', { purpose, card_id: cardId }),
+    issueToken: (purpose: 'identify' | 'redeem', cardId?: number, preferred?: { type: string; size: string }) =>
+        customer.post<QrToken>('/pwa/tokens', {
+            purpose,
+            card_id: cardId,
+            preferred_coffee_type: preferred?.type,
+            preferred_cup_size: preferred?.size,
+        }),
 }
 
 export const staffApi = {
@@ -23,7 +29,7 @@ export const staffApi = {
     logout: () => staff.post<{ message: string }>('/staff/logout'),
     products: () => staff.get<{ data: CardProduct[] }>('/staff/products'),
     drinks: () => staff.get<{ data: Drink[] }>('/staff/drinks'),
-    scan: (nonce: string, drinkId?: number) => staff.post<ScanResult>('/staff/scan', { nonce, drink_id: drinkId }),
+    scan: (nonce: string) => staff.post<ScanResult>('/staff/scan', { nonce }),
     dashboard: (params: { location_id?: number; from?: string; to?: string } = {}) => {
         const qs = new URLSearchParams()
         if (params.location_id) qs.set('location_id', String(params.location_id))
@@ -32,11 +38,18 @@ export const staffApi = {
         const suffix = qs.toString() ? `?${qs}` : ''
         return staff.get<DashboardData>(`/staff/dashboard${suffix}`)
     },
-    createCard: (customerId: number, productId: number, method: 'pin' | 'cash') =>
+    createCard: (
+        customerId: number,
+        productId: number,
+        method: 'pin' | 'cash',
+        preferred: { type: string; size: string },
+    ) =>
         staff.post<{ card: Card }>('/staff/cards', {
             customer_id: customerId,
             card_product_id: productId,
             payment: { method },
+            preferred_coffee_type: preferred.type,
+            preferred_cup_size: preferred.size,
         }),
     activateCard: (cardId: number, method: 'pin' | 'cash') =>
         staff.post<{ card: Card }>(`/staff/cards/${cardId}/activate`, { payment: { method } }),

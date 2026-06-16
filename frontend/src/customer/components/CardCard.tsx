@@ -30,7 +30,9 @@ export default function CardCard({ card, onShowQr }: { card: Card; onShowQr: (ca
                             {card.cups_remaining}
                             <span className="text-xl font-bold text-muted"> / {card.cups_total}</span>
                         </div>
-                        <div className="mt-1 text-sm text-muted">koppen koffie</div>
+                        <div className="mt-1 text-sm text-muted">
+                            {card.preferred_drink_label ?? 'koppen koffie'}
+                        </div>
                     </div>
                     <div className="text-3xl">☕</div>
                 </div>

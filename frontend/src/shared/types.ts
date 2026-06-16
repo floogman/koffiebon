@@ -16,6 +16,9 @@ export interface CardProduct {
 export interface Card {
     id: number
     status: CardStatus
+    preferred_coffee_type: string | null
+    preferred_cup_size: string | null
+    preferred_drink_label: string | null
     cups_total: number
     cups_remaining: number
     price_paid_cents: number | null
@@ -34,9 +37,18 @@ export interface Customer {
 
 export interface QrToken {
     nonce: string
+    code: string
     purpose: 'identify' | 'redeem'
+    preferred_drink: string | null
     expires_at: string
     url: string
+}
+
+/** Het vaste drankje van een kaart (type + maat) als tekst. */
+export interface DrinkChoice {
+    type: string
+    size: string
+    label: string
 }
 
 export interface Staff {
@@ -57,7 +69,7 @@ export interface Drink {
 }
 
 export type ScanResult =
-    | { type: 'identify'; customer: Customer; products: CardProduct[] }
+    | { type: 'identify'; customer: Customer; products: CardProduct[]; preferred_drink: DrinkChoice | null }
     | { type: 'redeem'; result: 'redeemed'; card: Card; drink: Drink | null; customer: { id: number; email: string } }
     | { type: 'redeem'; result: 'needs_activation'; message: string; card: Card }
 

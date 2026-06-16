@@ -1,21 +1,74 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { customerApi } from '@shared/clients'
 import { customerToken } from '@shared/auth'
+import { getEcho } from '@shared/echo'
 import type { Card } from '@shared/types'
 import { Banner, Logo, Screen, Spinner } from '@shared/ui'
 import CardCard from '../components/CardCard'
 import QrOverlay from '../components/QrOverlay'
 
+type CardUpdate = { action: 'redeemed' | 'activated' | 'issued'; card: Card }
+
+function flashFor({ action, card }: CardUpdate): string {
+    const n = card.cups_remaining
+    const koppen = `${n} ${n === 1 ? 'kop' : 'koppen'}`
+    switch (action) {
+        case 'redeemed':
+            return n === 0 ? '☕ Geschonken — je kaart is nu leeg' : `☕ Geschonken — nog ${koppen}`
+        case 'activated':
+            return `✅ Kaart geactiveerd — ${koppen} klaar`
+        case 'issued':
+            return `🎉 Nieuwe kaart — ${koppen}`
+    }
+}
+
 export default function HomePage({ onSignOut }: { onSignOut: () => void }) {
-    const [overlay, setOverlay] = useState<{ mode: 'identify' | 'redeem'; card?: Card } | null>(null)
+    const [overlay, setOverlay] = useState<{ mode: 'identify' | 'redeem'; cardId?: number } | null>(null)
+    const [flash, setFlash] = useState<string | null>(null)
+    const queryClient = useQueryClient()
 
     const { data, isLoading, isError } = useQuery({
         queryKey: ['me'],
         queryFn: customerApi.me,
-        // Live verversen zodat het saldo daalt zodra de balie scant.
-        refetchInterval: overlay ? 3000 : 10000,
+        // Reverb duwt updates direct; dit polt nog als veilig vangnet (of als Reverb uit staat).
+        refetchInterval: overlay ? 5000 : 20000,
     })
+
+    const customerId = data?.id
+
+    // Live kaart-updates via Reverb: zodra de balie scant, ververst het saldo direct
+    // en verschijnt er een bevestiging. Valt stil terug op polling als Reverb uit staat.
+    useEffect(() => {
+        if (!customerId) return
+        const echo = getEcho()
+        if (!echo) return
+
+        const channel = `Customer.${customerId}`
+        echo.private(channel).listen('.card.updated', (e: CardUpdate) => {
+            queryClient.invalidateQueries({ queryKey: ['me'] })
+            setFlash(flashFor(e))
+            // Na een scan terug naar de kaartpagina ('Toon aan de balie') met het nieuwe saldo,
+            // i.p.v. op de QR blijven hangen.
+            setOverlay((o) => {
+                if (!o) return o
+                if (e.action === 'issued' && o.mode === 'identify') return null
+                if (e.action === 'redeemed' && o.mode === 'redeem' && o.cardId === e.card.id) return null
+                return o
+            })
+        })
+
+        return () => {
+            echo.leave(channel)
+        }
+    }, [customerId, queryClient])
+
+    // Bevestiging vanzelf laten verdwijnen.
+    useEffect(() => {
+        if (!flash) return
+        const id = window.setTimeout(() => setFlash(null), 4000)
+        return () => window.clearTimeout(id)
+    }, [flash])
 
     const handle401 = () => {
         // Token ongeldig -> uitloggen.
@@ -47,9 +100,19 @@ export default function HomePage({ onSignOut }: { onSignOut: () => void }) {
     }
 
     const cards = data.cards ?? []
+    // Verse kaart uit de query, zodat het saldo in de overlay live meeloopt met de refetch.
+    const overlayCard = overlay?.cardId ? cards.find((c) => c.id === overlay.cardId) : undefined
 
     return (
         <>
+            {flash && (
+                <div className="fixed inset-x-0 top-4 z-[60] flex justify-center px-4">
+                    <div className="rounded-full bg-espresso px-5 py-2.5 text-center text-sm font-semibold text-cream shadow-lg">
+                        {flash}
+                    </div>
+                </div>
+            )}
+
             <Screen>
                 <header className="mb-6 flex items-center justify-between">
                     <Logo subtitle={data.email} />
@@ -72,7 +135,7 @@ export default function HomePage({ onSignOut }: { onSignOut: () => void }) {
                 ) : (
                     <div className="flex flex-col gap-4">
                         {cards.map((card) => (
-                            <CardCard key={card.id} card={card} onShowQr={(c) => setOverlay({ mode: 'redeem', card: c })} />
+                            <CardCard key={card.id} card={card} onShowQr={(c) => setOverlay({ mode: 'redeem', cardId: c.id })} />
                         ))}
                         <button
                             className="btn-ghost mt-2 text-sm"
@@ -84,12 +147,12 @@ export default function HomePage({ onSignOut }: { onSignOut: () => void }) {
                 )}
 
                 <div className="mt-auto pt-8 text-center text-xs text-muted">
-                    Kaart kwijt? Log uit en gebruik de herstellink in je e-mail.
+                    Op een ander toestel? Log uit en log opnieuw in met je e-mailadres — je kaarten staan veilig op de server.
                 </div>
             </Screen>
 
             {overlay && (
-                <QrOverlay mode={overlay.mode} card={overlay.card} onClose={() => setOverlay(null)} />
+                <QrOverlay mode={overlay.mode} card={overlayCard} onClose={() => setOverlay(null)} />
             )}
         </>
     )

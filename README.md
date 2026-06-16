@@ -60,20 +60,32 @@ In productie zet je `QUEUE_CONNECTION=database` en draai je een worker:
 > De ondertekende verificatielink wordt op het **verzendmoment** gegenereerd (TTL 24u), dus ook met
 > een trage queue arriveert hij nooit al verlopen.
 
-### Frontend (Vite PWA)
+### Frontend (Vite PWA) & Reverb — draaien automatisch
 
-De React-app staat in `frontend/` en draait **in de container** (Node 20). De dev-server proxyt
-`/api` naar de Laravel-app, dus alles is same-origin met bearer-tokens.
+De React-app staat in `frontend/` en draait **in de container** (Node 20). De Vite-dev-server én de
+**Reverb**-websocketserver worden door **supervisor** gestart, dus ze komen automatisch op met de
+container en herstarten bij een crash — geen losse `docker exec`-commando's meer nodig.
+
+Eénmalig de frontend-dependencies installeren (en na het wijzigen van `package.json`):
 
 ```bash
 docker exec -w /var/www/html/frontend koffiebon-laravel.bon-1 npm install
-docker exec -d -w /var/www/html/frontend koffiebon-laravel.bon-1 npm run dev
-# Productiebuild: npm run build  (genereert dist/ + service worker + manifest)
+# Productiebuild (optioneel): docker exec -w /var/www/html/frontend koffiebon-laravel.bon-1 npm run build
 ```
 
-De PWA draait op **http://localhost:5173** (klant op `/`, balie op `/balie`). Zet
-`FRONTEND_URL=http://localhost:5173` in `.env` zodat de e-mailverificatie en de QR-deeplink
-daarheen wijzen.
+> Pas je `docker/8.3/supervisord.conf` aan (of pull je deze versie voor het eerst), draai dan
+> éénmalig `./vendor/bin/sail build && ./vendor/bin/sail up -d` zodat de nieuwe config in het image komt.
+
+- **PWA:** http://localhost:5173 (klant op `/`, balie op `/balie`). Zet `FRONTEND_URL=http://localhost:5173`
+  in `.env` zodat e-mailverificatie en QR-deeplink daarheen wijzen.
+- **Reverb:** ws://localhost:8080 (poort staat in `docker-compose.yml`).
+
+Live-updates: zodra de balie een QR/code scant, werkt de klant-PWA het saldo **direct** bij en toont een
+bevestiging (`☕ Geschonken — nog 8`, `Kaart geactiveerd`, …). Valt stil terug op polling als Reverb uit
+staat. De klant-websocket authenticeert privé-kanalen via `POST /api/broadcasting/auth` (Sanctum
+bearer-token). Eigen credentials genereer je met `./vendor/bin/sail artisan reverb:install`.
+
+Logs van beide processen lopen mee in `./vendor/bin/sail logs -f` (supervisor → stdout).
 
 ## Tests
 

@@ -16,6 +16,9 @@ class CardResource extends JsonResource
         return [
             'id' => $this->id,
             'status' => $this->status->value,
+            'preferred_coffee_type' => $this->preferred_coffee_type?->value,
+            'preferred_cup_size' => $this->preferred_cup_size?->value,
+            'preferred_drink_label' => $this->preferredDrinkLabel(),
             'cups_total' => $this->cups_total,
             'cups_remaining' => $this->cups_remaining,
             'price_paid_cents' => $this->price_paid_cents,

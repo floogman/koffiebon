@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\CoffeeType;
+use App\Enums\CupSize;
 use App\Enums\QrPurpose;
 use App\Enums\QrSubjectType;
+use Database\Factories\QrTokenFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,10 +14,13 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Kortlevende, single-use QR-token. Alleen de hash van de nonce wordt opgeslagen.
  */
-#[Fillable(['subject_type', 'subject_id', 'nonce_hash', 'purpose', 'expires_at', 'consumed_at'])]
+#[Fillable([
+    'subject_type', 'subject_id', 'nonce_hash', 'code_hash', 'purpose',
+    'preferred_coffee_type', 'preferred_cup_size', 'expires_at', 'consumed_at',
+])]
 class QrToken extends Model
 {
-    /** @use HasFactory<\Database\Factories\QrTokenFactory> */
+    /** @use HasFactory<QrTokenFactory> */
     use HasFactory;
 
     public const UPDATED_AT = null;
@@ -24,6 +30,8 @@ class QrToken extends Model
         return [
             'subject_type' => QrSubjectType::class,
             'purpose' => QrPurpose::class,
+            'preferred_coffee_type' => CoffeeType::class,
+            'preferred_cup_size' => CupSize::class,
             'expires_at' => 'datetime',
             'consumed_at' => 'datetime',
             'created_at' => 'datetime',

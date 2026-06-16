@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Enums\CardEventType;
 use App\Enums\CardStatus;
+use App\Enums\CoffeeType;
+use App\Enums\CupSize;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Exceptions\IssuanceException;
@@ -13,6 +15,7 @@ use App\Models\Customer;
 use App\Models\Location;
 use App\Models\Payment;
 use App\Models\StaffUser;
+use App\Services\Concerns\BroadcastsCardUpdates;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -22,6 +25,8 @@ use Illuminate\Support\Facades\DB;
  */
 class CardIssuanceService
 {
+    use BroadcastsCardUpdates;
+
     /**
      * issue + activate + payment in één transactie (de balie-flow).
      *
@@ -31,6 +36,8 @@ class CardIssuanceService
         Customer $customer,
         CardProduct $product,
         PaymentMethod $method,
+        CoffeeType $coffeeType,
+        CupSize $cupSize,
         ?StaffUser $staff = null,
         ?Location $location = null,
     ): Card {
@@ -38,7 +45,7 @@ class CardIssuanceService
             throw IssuanceException::emailNotVerified();
         }
 
-        return DB::transaction(function () use ($customer, $product, $method, $staff, $location) {
+        $card = DB::transaction(function () use ($customer, $product, $method, $coffeeType, $cupSize, $staff, $location) {
             $price = $product->cups_paid * $product->price_per_cup_cents;
 
             $card = Card::create([
@@ -46,6 +53,8 @@ class CardIssuanceService
                 'card_product_id' => $product->getKey(),
                 'location_id' => $location?->getKey(),
                 'status' => CardStatus::Active,
+                'preferred_coffee_type' => $coffeeType,
+                'preferred_cup_size' => $cupSize,
                 'cups_total' => $product->cups_total,
                 'cups_remaining' => $product->cups_total,
                 'price_paid_cents' => $price,
@@ -59,6 +68,10 @@ class CardIssuanceService
 
             return $card;
         });
+
+        $this->broadcastCardUpdated($card, 'issued');
+
+        return $card;
     }
 
     /**
@@ -72,7 +85,7 @@ class CardIssuanceService
             throw IssuanceException::notPending();
         }
 
-        return DB::transaction(function () use ($card, $method, $staff) {
+        $card = DB::transaction(function () use ($card, $method, $staff) {
             $price = $card->price_paid_cents ?? ($card->cardProduct->cups_paid * $card->cardProduct->price_per_cup_cents);
 
             $card->update([
@@ -88,6 +101,10 @@ class CardIssuanceService
 
             return $card->refresh();
         });
+
+        $this->broadcastCardUpdated($card, 'activated');
+
+        return $card;
     }
 
     private function writeEvent(Card $card, CardEventType $type, ?StaffUser $staff): void

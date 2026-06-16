@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Pwa\PwaController;
 use App\Http\Controllers\Api\Staff\DashboardController;
 use App\Http\Controllers\Api\Staff\StaffAuthController;
 use App\Http\Controllers\Api\Staff\StaffController;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -32,9 +33,16 @@ Route::prefix('auth')->group(function () {
 */
 Route::middleware(['auth:sanctum', 'abilities:customer'])->prefix('pwa')->group(function () {
     Route::get('me', [PwaController::class, 'me']);
+    Route::get('drinks', [PwaController::class, 'drinks']);
     Route::get('cards/{card}', [PwaController::class, 'card']);
     Route::post('tokens', [PwaController::class, 'issueToken'])->middleware('throttle:60,1');
 });
+
+// Kanaal-autorisatie voor de PWA-websocket. De default /broadcasting/auth-route
+// leunt op cookies; de PWA werkt met bearer-tokens, dus hier een eigen endpoint
+// onder Sanctum. Echo wijst zijn authEndpoint naar /api/broadcasting/auth.
+Route::post('broadcasting/auth', fn () => Broadcast::auth(request()))
+    ->middleware(['auth:sanctum', 'abilities:customer']);
 
 /*
 |--------------------------------------------------------------------------

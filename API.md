@@ -55,13 +55,34 @@ Wisselt de eenmalige code in voor een Sanctum device-token (ability `customer`).
 → `{ "id", "email", "name", "email_verified", "cards": [ ... ] }` — de klant met alle kaarten + saldi.
 
 ### `GET /api/pwa/cards/{card}` _(customer)_
-→ kaartdetail (incl. `product`). `403` als de kaart niet van de klant is.
+→ kaartdetail (incl. `product`). Bevat ook `preferred_coffee_type`, `preferred_cup_size` en
+`preferred_drink_label` (bv. "Cappuccino · Medium"). `403` als de kaart niet van de klant is.
+
+### `GET /api/pwa/drinks` _(customer)_
+→ `{ "data": [ { id, type, type_label, size, size_label, cost_cents } ] }` — de actieve drankenkaart
+zodat de klant bij het kopen van een kaart een vast drankje kan kiezen. (Single-merchant MVP.)
 
 ### `POST /api/pwa/tokens` _(customer)_
-Body: `{ "purpose": "identify" }` of `{ "purpose": "redeem", "card_id": 1 }`
-→ `{ "nonce", "purpose", "expires_at", "url" }`. Kortlevend (~45s), single-use. `url` is de deeplink
-`{FRONTEND_URL}/s/{nonce}` voor een gewone camera. Redeem vereist een **actieve** eigen kaart.
-_Throttle: 60/min._
+Body: `{ "purpose": "identify", "preferred_coffee_type", "preferred_cup_size" }` of
+`{ "purpose": "redeem", "card_id": 1 }`
+→ `{ "nonce", "code", "purpose", "preferred_drink", "expires_at", "url" }`. Kortlevend (~60s),
+single-use. `url` is de deeplink `{FRONTEND_URL}/s/{nonce}` voor een gewone camera. `code` is een
+6-cijferige baliecode (100000–999999) die de balie i.p.v. de QR met de hand kan intypen — hoort bij
+dezelfde token, dus één scan/code consumeert beide. Bij **identify** kiest de klant vooraf een vast
+drankje (**verplicht**); dit reist mee in de token en komt op de nieuwe kaart. `preferred_drink` is de
+tekstuele weergave (identify: de gekozen drank; redeem: het vaste drankje van de kaart). Redeem vereist
+een **actieve** eigen kaart. _Throttle: 60/min._
+
+### `POST /api/broadcasting/auth` _(customer)_
+Kanaal-autorisatie voor de WebSocket (Reverb). De PWA stuurt `{ socket_id, channel_name }`; de server
+autoriseert alleen het eigen kanaal `private-Customer.{id}`. Bearer-token (geen cookies), zodat de PWA
+same-origin met Sanctum werkt.
+
+### Live events (Reverb)
+Privé-kanaal **`Customer.{id}`** zendt event **`card.updated`** zodra de balie een kaart wijzigt:
+`{ "action": "redeemed" | "activated" | "issued", "card": { …CardResource } }`. De PWA ververst
+daarmee direct het saldo en toont een bevestiging. Best-effort: een Reverb-storing laat de
+balie-flow nooit falen.
 
 ---
 
@@ -80,17 +101,21 @@ card_price_cents, gift_cups, discount_rate } ] }` — actieve producten van de m
 
 ### `GET /api/staff/drinks` _(staff)_
 → `{ "data": [ { id, type, type_label, size, size_label, cost_cents } ] }` — de drankenkaart
-(4 soorten × 3 maten) van de merchant, voor de drank-keuze bij het verzilveren.
+(4 soorten × 3 maten) van de merchant. _(Niet meer gebruikt bij het scannen: het drankje volgt uit de
+kaart. Beschikbaar voor beheer/overzicht.)_
 
 ### `POST /api/staff/scan` _(staff)_
-Body: `{ "nonce": "...", "drink_id"?: 1 }`. Consumeert de token **atomisch** (single-use) en handelt
-af op `purpose`:
+Body: `{ "nonce": "..." }`. Consumeert de token **atomisch** (single-use) en handelt af op `purpose`.
+De balie kiest géén drankje meer: bij verzilveren volgt het geschonken drankje uit het **vaste drankje
+van de kaart**.
 
-- **identify** → `{ "type": "identify", "customer": { ...kaarten }, "products": [ ... ] }`
-  (start de nieuwe-kaart-flow).
+- **identify** → `{ "type": "identify", "customer": { ...kaarten }, "products": [ ... ],
+  "preferred_drink": { "type", "size", "label" } | null }` (start de nieuwe-kaart-flow; `preferred_drink`
+  is het in de PWA gekozen vaste drankje dat de balie op de nieuwe kaart vastlegt).
 - **redeem**, kaart actief → `{ "type": "redeem", "result": "redeemed", "card": { ...nieuw saldo },
-  "drink": { ... } | null, "customer": { id, email } }`. Een opgegeven `drink_id` wordt op het
-  redeem-event vastgelegd (type/maat/kostprijs) voor analytics; één scan blijft één kop.
+  "drink": { ... } | null, "customer": { id, email } }`. Het redeem-event legt het **vaste drankje van
+  de kaart** vast (type/maat als tekst); de bijpassende drink-rij levert de kostprijs (`drink` is `null`
+  als die niet meer bestaat). Eén scan blijft één kop.
 - **redeem**, kaart `pending` → `409 { "result": "needs_activation", ... }`.
 - leeg/verlopen/ongeldig → `409 card_not_redeemable` / `token_*`.
 
@@ -115,9 +140,11 @@ Query: `location_id?` (vestiging van de merchant), `from?`/`to?` (datums, defaul
 ```
 
 ### `POST /api/staff/cards` _(staff)_
-Body: `{ "customer_id", "card_product_id", "payment": { "method": "pin"|"cash" } }`
+Body: `{ "customer_id", "card_product_id", "payment": { "method": "pin"|"cash" },
+"preferred_coffee_type", "preferred_cup_size" }`
 → `201 { "card": { ... } }`. Doet `issue + activate + payment` in één transactie. De kaartprijs wordt
-**server-side** afgeleid (`cups_paid × price_per_cup_cents`). Vereist een geverifieerd e-mailadres
+**server-side** afgeleid (`cups_paid × price_per_cup_cents`). Het vaste drankje (verplicht) komt uit de
+identify-scan en wordt als tekst op de kaart vastgelegd. Vereist een geverifieerd e-mailadres
 (anders `422 email_not_verified`).
 
 ### `POST /api/staff/cards/{card}/activate` _(staff)_

@@ -3,6 +3,8 @@
 namespace Database\Factories;
 
 use App\Enums\CardStatus;
+use App\Enums\CoffeeType;
+use App\Enums\CupSize;
 use App\Models\Card;
 use App\Models\CardProduct;
 use App\Models\Customer;
@@ -22,6 +24,8 @@ class CardFactory extends Factory
             'card_product_id' => CardProduct::factory(),
             'location_id' => null,
             'status' => CardStatus::Pending,
+            'preferred_coffee_type' => fake()->randomElement(CoffeeType::cases()),
+            'preferred_cup_size' => fake()->randomElement(CupSize::cases()),
             'cups_total' => 12,
             'cups_remaining' => 12,
             'price_paid_cents' => null,

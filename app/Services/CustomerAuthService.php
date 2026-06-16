@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 /**
- * Passwordless klant-authenticatie: registratie, e-mailverificatie, magic-link-herstel
- * en het inwisselen van een eenmalige device-claim-code voor een Sanctum device-token.
+ * Passwordless klant-authenticatie: registratie, e-mailverificatie, inloggen via een
+ * e-maillink en het inwisselen van een eenmalige device-claim-code voor een Sanctum device-token.
  */
 class CustomerAuthService
 {
@@ -26,14 +26,14 @@ class CustomerAuthService
         );
 
         Mail::to($customer->email)->send(
-            new CustomerLinkMail($customer, isRecovery: false),
+            new CustomerLinkMail($customer, isLogin: false),
         );
 
         return $customer;
     }
 
     /**
-     * Herstel: mail opnieuw een ondertekende link, maar alleen als de klant bestaat.
+     * Inloggen: mail opnieuw een ondertekende link, maar alleen als de klant bestaat.
      * Retourneert null als er geen klant is (stil, om enumeratie te voorkomen).
      */
     public function sendMagicLink(string $email): ?Customer
@@ -45,7 +45,7 @@ class CustomerAuthService
         }
 
         Mail::to($customer->email)->send(
-            new CustomerLinkMail($customer, isRecovery: true),
+            new CustomerLinkMail($customer, isLogin: true),
         );
 
         return $customer;

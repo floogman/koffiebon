@@ -26,13 +26,18 @@ beforeEach(function () {
     ]);
 });
 
-function activeCardAt($ctx, $location)
+function activeCardAt($ctx, $location, CoffeeType $type = CoffeeType::Cappuccino, CupSize $size = CupSize::Large)
 {
+    // Het geschonken drankje volgt nu uit het vaste voorkeursdrankje van de kaart.
     return Card::factory()->active()
         ->for(Customer::factory())
         ->for($ctx->product, 'cardProduct')
         ->for($location)
-        ->create(['cups_total' => 12, 'cups_remaining' => 12]);
+        ->create([
+            'cups_total' => 12, 'cups_remaining' => 12,
+            'preferred_coffee_type' => $type,
+            'preferred_cup_size' => $size,
+        ]);
 }
 
 it('weigert het dashboard voor niet-admin staff', function () {
@@ -50,8 +55,8 @@ it('toont echte cijfers uit het grootboek voor een admin', function () {
     $svc->redeemCup($c1->fresh(), $this->balie, $this->cappu);
     $svc->redeemCup($c1->fresh(), $this->balie, $this->cappu);
 
-    // Station: 1 kaart, 1 verzilvering (zonder drankje).
-    $s1 = activeCardAt($this, $this->station);
+    // Station: 1 kaart met een ander vast drankje, 1 verzilvering zonder gematchte drink-rij.
+    $s1 = activeCardAt($this, $this->station, CoffeeType::Regular, CupSize::Small);
     $svc->redeemCup($s1, $this->balie);
 
     Sanctum::actingAs($this->admin, ['staff']);
@@ -89,15 +94,15 @@ it('filtert het dashboard op vestiging', function () {
     expect($centrum->json('by_location'))->toHaveCount(2);
 });
 
-it('legt het geschonken drankje vast bij een scan-verzilvering', function () {
-    $card = activeCardAt($this, $this->centrum);
-    $card->update(['customer_id' => $card->customer_id]);
+it('legt het vaste drankje van de kaart vast bij een scan-verzilvering', function () {
+    // Kaart met vast drankje cappuccino-large; de balie kiest niets meer.
+    $card = activeCardAt($this, $this->centrum, CoffeeType::Cappuccino, CupSize::Large);
 
     Sanctum::actingAs($card->customer, ['customer']);
     $nonce = $this->postJson('/api/pwa/tokens', ['purpose' => 'redeem', 'card_id' => $card->id])->json('nonce');
 
     Sanctum::actingAs($this->balie, ['staff']);
-    $this->postJson('/api/staff/scan', ['nonce' => $nonce, 'drink_id' => $this->cappu->id])
+    $this->postJson('/api/staff/scan', ['nonce' => $nonce])
         ->assertOk()
         ->assertJsonPath('result', 'redeemed')
         ->assertJsonPath('drink.type', 'cappuccino')

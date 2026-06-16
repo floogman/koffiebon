@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
-import type { Drink } from '@shared/types'
+import type { Drink } from './types'
 
 /**
- * Kiest het geschonken drankje (koffiesoort × maat). De selectie wordt met de
- * volgende scan meegestuurd voor de analytics; één scan blijft één kop.
+ * Kiest een koffiesoort × maat uit de drankenkaart. Gedeeld tussen de balie
+ * (welk drankje schenk je) en de klant-PWA (welk vast drankje hoort bij de kaart).
  */
 export default function DrinkPicker({
     drinks,
@@ -11,12 +11,14 @@ export default function DrinkPicker({
     size,
     onType,
     onSize,
+    title = 'Wat schenk je?',
 }: {
     drinks: Drink[]
     type: string
     size: string
     onType: (t: string) => void
     onSize: (s: string) => void
+    title?: string
 }) {
     const types = useMemo(() => {
         const seen = new Map<string, string>()
@@ -32,7 +34,7 @@ export default function DrinkPicker({
 
     return (
         <div className="card flex flex-col gap-3 p-4">
-            <div className="text-sm font-semibold text-muted">Wat schenk je?</div>
+            <div className="text-sm font-semibold text-muted">{title}</div>
             <div className="flex flex-wrap gap-2">
                 {types.map(([value, label]) => (
                     <button

@@ -17,11 +17,11 @@
                     </tr>
                     <tr>
                         <td style="padding:32px;">
-                            @if ($isRecovery)
-                                <h1 style="margin:0 0 12px;font-size:20px;">Je kaarten herstellen</h1>
+                            @if ($isLogin)
+                                <h1 style="margin:0 0 12px;font-size:20px;">Inloggen op dit toestel</h1>
                                 <p style="margin:0 0 24px;line-height:1.5;color:#3a2a20;">
-                                    Klik op de knop om je Koffiebon-kaarten op dit toestel terug te laden.
-                                    Je saldo staat veilig op de server.
+                                    Klik op de knop om in te loggen en je Koffiebon-kaarten op dit toestel te
+                                    laden. Je kaarten en saldo staan veilig op de server.
                                 </p>
                             @else
                                 <h1 style="margin:0 0 12px;font-size:20px;">Bevestig je e-mailadres</h1>
@@ -31,7 +31,7 @@
                             @endif
 
                             <a href="{{ $url }}" style="display:inline-block;background:#c5772a;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:700;">
-                                {{ $isRecovery ? 'Kaarten herstellen' : 'E-mailadres bevestigen' }}
+                                {{ $isLogin ? 'Inloggen' : 'E-mailadres bevestigen' }}
                             </a>
 
                             <p style="margin:24px 0 0;font-size:13px;color:#8a7565;line-height:1.5;">

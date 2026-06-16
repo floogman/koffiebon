@@ -16,10 +16,15 @@ export default function RotatingQr({
     purpose,
     cardId,
     label,
+    preferredType,
+    preferredSize,
 }: {
     purpose: 'identify' | 'redeem'
     cardId?: number
     label: string
+    // Bij het kopen van een kaart (identify) reist de gekozen drank mee in de token.
+    preferredType?: string
+    preferredSize?: string
 }) {
     const online = useOnline()
     const [token, setToken] = useState<QrToken | null>(null)
@@ -30,14 +35,18 @@ export default function RotatingQr({
     const refresh = useCallback(async () => {
         try {
             setError(null)
-            const t = await customerApi.issueToken(purpose, cardId)
+            const preferred =
+                purpose === 'identify' && preferredType && preferredSize
+                    ? { type: preferredType, size: preferredSize }
+                    : undefined
+            const t = await customerApi.issueToken(purpose, cardId, preferred)
             setToken(t)
             const secs = Math.max(0, Math.round((new Date(t.expires_at).getTime() - Date.now()) / 1000))
             setSecondsLeft(secs)
         } catch (e) {
             setError(isApiError(e) ? e.message : 'Kon geen QR ophalen.')
         }
-    }, [purpose, cardId])
+    }, [purpose, cardId, preferredType, preferredSize])
 
     // Eerste token + auto-refresh interval.
     useEffect(() => {
@@ -73,6 +82,15 @@ export default function RotatingQr({
 
     return (
         <div className="flex flex-col items-center gap-4">
+            {token && (
+                <div className="flex flex-col items-center gap-1">
+                    <span className="text-xs uppercase tracking-wide text-muted">Of noem deze code</span>
+                    <span className="font-mono text-3xl font-bold tracking-[0.3em] text-espresso">
+                        {token.code}
+                    </span>
+                </div>
+            )}
+
             <div className="relative rounded-2xl bg-white p-5 shadow-sm">
                 {token ? (
                     <QRCodeSVG
