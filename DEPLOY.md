@@ -33,15 +33,47 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
-## 2. Code ophalen
+## 2. Code ophalen (via een GitHub deploy key)
+
+Op deze VPS draaien meerdere repos. Een GitHub **deploy key** hangt aan precies één repository,
+dus geef koffiebon zijn eigen sleutel + een **SSH host-alias** (zelfde patroon als `klusviewer`).
+Zo blijft de default `git@github.com` vrij voor andere repos.
 
 ```bash
+# 2a. Deploy-key genereren (read-only volstaat voor pullen)
+ssh-keygen -t ed25519 -f ~/.ssh/koffiebon_deploy -N "" -C "koffiebon-deploy"
+cat ~/.ssh/koffiebon_deploy.pub
+```
+
+Voeg die **publieke** sleutel toe in GitHub → repo `floogman/koffiebon` →
+**Settings → Deploy keys → Add deploy key** (laat "Allow write access" uit).
+
+```bash
+# 2b. SSH host-alias zodat git de juiste deploy-key pakt
+cat >> ~/.ssh/config <<'EOF'
+
+Host koffiebon-github
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/koffiebon_deploy
+    IdentitiesOnly yes
+EOF
+
+# 2c. Verbinding testen (verwacht: "Hi floogman/koffiebon! You've successfully authenticated...")
+ssh -T koffiebon-github
+```
+
+```bash
+# 2d. Clonen via de alias
 sudo mkdir -p /var/www/koffiebon
 sudo chown -R $USER:www-data /var/www/koffiebon
-git clone <jouw-git-remote> /var/www/koffiebon
+git clone koffiebon-github:floogman/koffiebon.git /var/www/koffiebon
 cd /var/www/koffiebon
-git checkout main        # of je deploy-branch
+git checkout setup/laravel-sail-scaffold     # of main, afhankelijk van je deploy-branch
 ```
+
+> Omdat de remote `koffiebon-github:...` is, gebruikt elke latere `git pull` (ook in
+> `deploy/deploy.sh`) automatisch deze deploy-key.
 
 ## 3. `.env` aanmaken
 
