@@ -90,13 +90,16 @@ echo "REVERB_APP_SECRET=$(openssl rand -hex 32)"
 Vul in `.env` ook de **echte SMTP-gegevens** in (`MAIL_HOST`, `MAIL_USERNAME`, …). Zonder
 werkende SMTP komen de verificatie-/magic-link-mails niet aan.
 
-## 4. SQLite + rechten
+## 4. SQLite-bestand aanmaken
 
 ```bash
 touch database/database.sqlite
-sudo chown -R www-data:www-data storage bootstrap/cache database
-sudo chmod -R ug+rw storage bootstrap/cache database
 ```
+
+> De rechten (`storage`, `bootstrap/cache`, `database`) zetten we **na** de install (stap 5).
+> Doe je dat nu al, dan maken de artisan-commando's in stap 5 alsnog bestanden aan die eigendom
+> zijn van de uitvoerende gebruiker (vaak root) i.p.v. `www-data` — en dan kan PHP-FPM het
+> `laravel.log` niet openen.
 
 ## 5. Eerste install (backend + frontend)
 
@@ -115,10 +118,16 @@ composer install --no-dev --optimize-autoloader    # daarna afslanken naar produ
 
 # Caches
 php artisan optimize                               # config/route/view-cache
+
+# Rechten — NA de artisan-commando's, zodat www-data ook de net aangemaakte
+# logs/caches/sqlite kan schrijven (anders: "could not be opened in append mode").
+sudo chown -R www-data:www-data storage bootstrap/cache database
+sudo chmod -R ug+rwX storage bootstrap/cache database
+sudo chmod g+s storage bootstrap/cache             # nieuwe bestanden erven de www-data-groep
 ```
 
-> Latere deploys (`deploy/deploy.sh`) draaien **geen** `db:seed` en hebben faker niet nodig;
-> daar volstaat `composer install --no-dev`.
+> Latere deploys (`deploy/deploy.sh`) draaien **geen** `db:seed`, hebben faker niet nodig, en
+> herzetten de rechten zelf na afloop.
 
 ## 6. systemd-services (Reverb + queue)
 
@@ -162,7 +171,7 @@ verwijst naar de certificaten en voegt een 80→443-redirect toe:
 
 ```bash
 sudo certbot --nginx -d koffie.klusviewer.nl --redirect \
-  -m claude@so-ict.nl --agree-tos --no-eff-email
+  -m certbot@so-ict.nl --agree-tos --no-eff-email
 ```
 
 - `--nginx` past je vhost direct aan; je hoeft niets handmatig te bewerken.

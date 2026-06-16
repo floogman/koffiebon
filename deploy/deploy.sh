@@ -20,6 +20,10 @@ echo "→ Frontend build (Vite PWA)"
 echo "→ Caches verversen"
 php artisan optimize
 
+echo "→ Rechten herzetten (www-data moet logs/caches/sqlite kunnen schrijven)"
+sudo chown -R www-data:www-data storage bootstrap/cache database
+sudo chmod -R ug+rwX storage bootstrap/cache database
+
 echo "→ Workers herstarten"
 php artisan queue:restart                 # queue-worker stopt netjes; systemd herstart hem
 sudo systemctl restart koffiebon-reverb   # Reverb herladen
