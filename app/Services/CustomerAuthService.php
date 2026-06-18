@@ -2,113 +2,130 @@
 
 namespace App\Services;
 
-use App\Exceptions\TokenException;
+use App\Events\LoginConfirmed;
+use App\Exceptions\LoginException;
 use App\Mail\CustomerLinkMail;
 use App\Models\Customer;
-use App\Models\DeviceClaim;
+use App\Models\LoginSession;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 /**
- * Passwordless klant-authenticatie: registratie, e-mailverificatie, inloggen via een
- * e-maillink en het inwisselen van een eenmalige device-claim-code voor een Sanctum device-token.
+ * Passwordless, cross-device klant-authenticatie.
+ *
+ * Flow:
+ *  1. De PWA genereert een geheim `s` en stuurt `channel_hash = sha256(s)`.
+ *     loginRequest() maakt een login-sessie (alleen hashes at rest) en mailt een
+ *     ondertekende bevestigingslink.
+ *  2. De klant klikt de link → confirm(): sessie wordt `confirmed`, e-mail geverifieerd,
+ *     en een publiek event `login.{channel_hash}` seint de wachtende PWA in.
+ *  3. De PWA wisselt `s` in voor een device-token → claim(): atomisch, single-use.
+ *
+ * De server kent het platte geheim nooit; inloggen vereist het preimage `s`, dat alleen
+ * de initiërende PWA bezit. Een binnenkomende push draagt geen id/token.
  */
 class CustomerAuthService
 {
     /**
-     * Maak/zoek een klant op e-mail en mail een ondertekende verificatielink.
-     * Lekt nooit of het e-mailadres al bestond.
+     * Start een login: maak/zoek de klant, leg een sessie vast en mail een bevestigingslink.
+     * `channelHash` is sha256(geheim), client-side door de PWA gegenereerd. Lekt nooit of
+     * het e-mailadres al bestond.
      */
-    public function register(string $email): Customer
+    public function loginRequest(string $email, string $channelHash): void
     {
-        $customer = Customer::firstOrCreate(
-            ['email' => Str::lower($email)],
-        );
+        $customer = Customer::firstOrCreate(['email' => Str::lower($email)]);
+        $isNew = $customer->wasRecentlyCreated;
 
-        Mail::to($customer->email)->send(
-            new CustomerLinkMail($customer, isLogin: false),
-        );
+        $emailToken = bin2hex(random_bytes(32));
 
-        return $customer;
+        LoginSession::create([
+            'customer_id' => $customer->getKey(),
+            'secret_hash' => $channelHash,
+            'email_token_hash' => hash('sha256', $emailToken),
+            'status' => LoginSession::PENDING,
+            'expires_at' => now()->addMinutes(config('koffiebon.login_session_minutes')),
+        ]);
+
+        Mail::to($customer->email)->send(new CustomerLinkMail($emailToken, isNew: $isNew));
     }
 
     /**
-     * Inloggen: mail opnieuw een ondertekende link, maar alleen als de klant bestaat.
-     * Retourneert null als er geen klant is (stil, om enumeratie te voorkomen).
+     * Verwerk een (signed) e-mailklik: markeer de sessie bevestigd, verifieer de e-mail en
+     * sein de wachtende PWA in via het publieke kanaal. Idempotent: opnieuw klikken op een
+     * al bevestigde sessie herhaalt enkel het seintje.
+     *
+     * @return 'confirmed'|'already' status voor de bevestigingspagina
      */
-    public function sendMagicLink(string $email): ?Customer
+    public function confirm(string $emailToken): string
     {
-        $customer = Customer::where('email', Str::lower($email))->first();
+        $session = LoginSession::where('email_token_hash', hash('sha256', $emailToken))->first();
 
-        if ($customer === null) {
-            return null;
+        if ($session === null) {
+            throw LoginException::invalid();
         }
 
-        Mail::to($customer->email)->send(
-            new CustomerLinkMail($customer, isLogin: true),
-        );
-
-        return $customer;
-    }
-
-    /**
-     * Verwerk een geldige (signed) verificatie: markeer geverifieerd en maak een
-     * eenmalige device-claim-code. Retourneert de redirect-URL naar de PWA met de code.
-     */
-    public function verifyAndIssueClaim(Customer $customer): string
-    {
-        if (! $customer->hasVerifiedEmail()) {
-            $customer->forceFill(['email_verified_at' => now()])->save();
+        if ($session->status === LoginSession::PENDING && $session->isExpired()) {
+            throw LoginException::expired();
         }
 
-        $code = $this->createDeviceClaim($customer);
+        if ($session->status === LoginSession::CONSUMED) {
+            return 'already';
+        }
 
-        return rtrim((string) config('koffiebon.frontend_url'), '/').'/claim?code='.$code;
+        if ($session->status === LoginSession::PENDING) {
+            $session->forceFill([
+                'status' => LoginSession::CONFIRMED,
+                'confirmed_at' => now(),
+            ])->save();
+
+            $customer = $session->customer;
+            if (! $customer->hasVerifiedEmail()) {
+                $customer->forceFill(['email_verified_at' => now()])->save();
+            }
+        }
+
+        // Seintje naar de wachtende PWA; payload bevat geen id/token.
+        LoginConfirmed::dispatch($session->secret_hash);
+
+        return $session->status === LoginSession::CONFIRMED ? 'confirmed' : 'already';
     }
 
     /**
-     * Wissel een device-claim-code in voor een Sanctum device-token.
+     * Wissel het geheim in voor een Sanctum device-token. `secret` is het preimage van
+     * `secret_hash`. Pending → de PWA polt door; confirmed → atomisch consumed + token.
      *
      * @return array{customer: Customer, token: string}
      *
-     * @throws TokenException als de code onbekend, verlopen of al gebruikt is.
+     * @throws LoginException
      */
-    public function claim(string $code): array
+    public function claim(string $secret): array
     {
-        $claim = DeviceClaim::where('code_hash', hash('sha256', $code))->first();
+        $session = LoginSession::where('secret_hash', hash('sha256', $secret))->first();
 
-        if ($claim === null) {
-            throw TokenException::invalid();
+        if ($session === null) {
+            throw LoginException::invalid();
         }
 
-        if (! $claim->isUsable()) {
-            throw $claim->consumed_at !== null ? TokenException::alreadyUsed() : TokenException::expired();
+        if ($session->status === LoginSession::CONSUMED) {
+            throw LoginException::consumed();
         }
 
-        $affected = DeviceClaim::whereKey($claim->getKey())
-            ->whereNull('consumed_at')
-            ->update(['consumed_at' => now()]);
+        if ($session->status === LoginSession::PENDING) {
+            throw $session->isExpired() ? LoginException::expired() : LoginException::pending();
+        }
+
+        // status === CONFIRMED: race-veilig precies één keer consumeren.
+        $affected = LoginSession::whereKey($session->getKey())
+            ->where('status', LoginSession::CONFIRMED)
+            ->update(['status' => LoginSession::CONSUMED, 'consumed_at' => now()]);
 
         if ($affected === 0) {
-            throw TokenException::alreadyUsed();
+            throw LoginException::consumed();
         }
 
-        $customer = $claim->customer;
+        $customer = $session->customer;
         $token = $customer->createToken('pwa-device', ['customer'])->plainTextToken;
 
         return ['customer' => $customer, 'token' => $token];
-    }
-
-    private function createDeviceClaim(Customer $customer): string
-    {
-        $code = bin2hex(random_bytes(16));
-
-        DeviceClaim::create([
-            'customer_id' => $customer->getKey(),
-            'code_hash' => hash('sha256', $code),
-            'expires_at' => now()->addSeconds(config('koffiebon.device_claim_ttl')),
-        ]);
-
-        return $code;
     }
 }

@@ -43,6 +43,24 @@ export function getEcho(): Echo<'reverb'> | null {
     return echo
 }
 
+/**
+ * Abonneer op het PUBLIEKE login-kanaal `login.{channelHash}` en roep `onConfirmed` aan
+ * zodra de e-maillink bevestigd is. Geen token nodig: de kanaalnaam is de hash van een
+ * 256-bit geheim. Geeft een unsubscribe-functie terug. Valt stil weg (no-op) als Reverb
+ * niet geconfigureerd is — dan leunt de PWA op polling.
+ */
+export function subscribeLoginConfirmed(channelHash: string, onConfirmed: () => void): () => void {
+    const e = getEcho()
+    if (!e) return () => {}
+
+    const name = `login.${channelHash}`
+    e.channel(name).listen('.login.confirmed', () => onConfirmed())
+
+    return () => {
+        e.leaveChannel(name)
+    }
+}
+
 /** Verbreek de verbinding (bij uitloggen) zodat een volgend toestel/token vers begint. */
 export function disconnectEcho(): void {
     echo?.disconnect()

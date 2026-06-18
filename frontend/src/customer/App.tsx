@@ -14,7 +14,7 @@ export default function CustomerApp() {
     }
 
     if (!token) {
-        return <AuthPage />
+        return <AuthPage onAuthenticated={setToken} />
     }
 
     return <HomePage onSignOut={signOut} />

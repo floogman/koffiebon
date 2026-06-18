@@ -7,10 +7,10 @@ const staff = makeApi(staffToken.get)
 const anon = makeApi(null)
 
 export const customerApi = {
-    register: (email: string) => anon.post<{ message: string }>('/auth/register', { email }),
-    magicLink: (email: string) => anon.post<{ message: string }>('/auth/magic-link', { email }),
-    claim: (code: string) =>
-        anon.post<{ device_token: string; customer: Customer }>('/auth/claim', { code }),
+    loginRequest: (email: string, channelHash: string) =>
+        anon.post<{ message: string }>('/auth/login-request', { email, channel_hash: channelHash }),
+    claim: (secret: string) =>
+        anon.post<{ device_token: string; customer: Customer }>('/auth/claim', { secret }),
     me: () => customer.get<Customer>('/pwa/me'),
     drinks: () => customer.get<{ data: Drink[] }>('/pwa/drinks'),
     card: (id: number) => customer.get<Card>(`/pwa/cards/${id}`),

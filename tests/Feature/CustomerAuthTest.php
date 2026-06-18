@@ -1,98 +1,157 @@
 <?php
 
+use App\Events\LoginConfirmed;
 use App\Mail\CustomerLinkMail;
 use App\Models\Customer;
-use App\Models\DeviceClaim;
+use App\Models\LoginSession;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 
-it('registreert een klant en mailt een verificatielink', function () {
+/** Maak een pending login-sessie + retourneer het platte geheim en email-token. */
+function makeSession(Customer $customer, array $overrides = []): array
+{
+    $secret = bin2hex(random_bytes(32));
+    $emailToken = bin2hex(random_bytes(32));
+
+    $session = LoginSession::create(array_merge([
+        'customer_id' => $customer->id,
+        'secret_hash' => hash('sha256', $secret),
+        'email_token_hash' => hash('sha256', $emailToken),
+        'status' => LoginSession::PENDING,
+        'expires_at' => now()->addMinutes(30),
+    ], $overrides));
+
+    return ['session' => $session, 'secret' => $secret, 'email_token' => $emailToken];
+}
+
+it('start een login: maakt de klant + een sessie en mailt een bevestigingslink', function () {
     Mail::fake();
 
-    $this->postJson('/api/auth/register', ['email' => 'nieuw@klant.test'])
-        ->assertStatus(202);
+    $secret = bin2hex(random_bytes(32));
+    $this->postJson('/api/auth/login-request', [
+        'email' => 'nieuw@klant.test',
+        'channel_hash' => hash('sha256', $secret),
+    ])->assertStatus(202);
 
     expect(Customer::where('email', 'nieuw@klant.test')->exists())->toBeTrue();
+    expect(LoginSession::where('secret_hash', hash('sha256', $secret))->where('status', 'pending')->exists())->toBeTrue();
     Mail::assertQueued(CustomerLinkMail::class);
 });
 
-it('genereert de verificatielink op het verzendmoment, niet bij het in de wachtrij zetten', function () {
-    // Korte TTL om het effect van queue-vertraging zichtbaar te maken.
-    config(['koffiebon.verification_link_minutes' => 30]);
+it('antwoordt generiek voor elk adres (lekt niet of het bestond)', function () {
+    Mail::fake();
+    $secret = bin2hex(random_bytes(32));
+
+    $this->postJson('/api/auth/login-request', [
+        'email' => 'onbekend@niemand.test',
+        'channel_hash' => hash('sha256', $secret),
+    ])->assertStatus(202);
+
+    Mail::assertQueued(CustomerLinkMail::class);
+});
+
+it('vereist een geldige channel_hash', function () {
+    $this->postJson('/api/auth/login-request', ['email' => 'a@b.test'])
+        ->assertStatus(422);
+
+    $this->postJson('/api/auth/login-request', ['email' => 'a@b.test', 'channel_hash' => 'te-kort'])
+        ->assertStatus(422);
+});
+
+it('genereert de bevestigingslink op het verzendmoment, niet bij het in de wachtrij zetten', function () {
+    config(['koffiebon.login_session_minutes' => 600]);
     $customer = Customer::factory()->unverified()->create();
+    ['email_token' => $emailToken] = makeSession($customer, ['expires_at' => now()->addMinutes(600)]);
 
-    $mail = new CustomerLinkMail($customer);
+    $mail = new CustomerLinkMail($emailToken);
 
-    // De mail blijft 2 uur in de wachtrij staan voordat hij verstuurd (gerenderd) wordt.
+    // De mail blijft 2 uur in de wachtrij voordat hij verstuurd (gerenderd) wordt.
     $this->travel(2)->hours();
 
-    preg_match('#https?://[^"\s]*/api/auth/verify/\d+\?[^"\s]+#', $mail->render(), $m);
+    preg_match('#https?://[^"\s]*/api/auth/confirm/[a-f0-9]+\?[^"\s]+#', $mail->render(), $m);
     $url = html_entity_decode($m[0]);
 
-    // De link is nog geldig: de TTL begon pas bij het renderen, niet 2 uur eerder.
-    $this->get($url)->assertRedirect();
+    // Nog geldig: de TTL begon pas bij het renderen, niet 2 uur eerder.
+    $this->get($url)->assertOk();
     expect($customer->fresh()->hasVerifiedEmail())->toBeTrue();
 });
 
-it('verifieert via een signed link en redirect met een claim-code', function () {
+it('bevestigt via een signed link, verifieert de e-mail en seint de PWA in', function () {
+    Event::fake([LoginConfirmed::class]);
     $customer = Customer::factory()->unverified()->create();
+    ['session' => $session, 'email_token' => $emailToken] = makeSession($customer);
 
-    $url = URL::temporarySignedRoute('api.auth.verify', now()->addHour(), ['customer' => $customer->id]);
-
-    $response = $this->get($url);
-    $response->assertRedirect();
+    $url = URL::temporarySignedRoute('api.auth.confirm', now()->addHour(), ['token' => $emailToken]);
+    $this->get($url)->assertOk();
 
     expect($customer->fresh()->hasVerifiedEmail())->toBeTrue();
-    expect($response->headers->get('Location'))->toContain('/claim?code=');
-    expect(DeviceClaim::where('customer_id', $customer->id)->exists())->toBeTrue();
+    expect($session->fresh()->status)->toBe('confirmed');
+
+    Event::assertDispatched(LoginConfirmed::class, fn (LoginConfirmed $e) => $e->secretHash === $session->secret_hash);
 });
 
-it('weigert een verify-link zonder geldige signature', function () {
+it('weigert een confirm-link zonder geldige signature', function () {
     $customer = Customer::factory()->unverified()->create();
+    ['email_token' => $emailToken] = makeSession($customer);
 
-    $this->get("/api/auth/verify/{$customer->id}")->assertForbidden();
+    $this->get("/api/auth/confirm/{$emailToken}")->assertForbidden();
     expect($customer->fresh()->hasVerifiedEmail())->toBeFalse();
 });
 
-it('wisselt een claim-code in voor een werkend device-token', function () {
+it('geeft login_pending zolang de sessie nog niet bevestigd is', function () {
     $customer = Customer::factory()->create();
-    $code = bin2hex(random_bytes(16));
-    DeviceClaim::create([
-        'customer_id' => $customer->id,
-        'code_hash' => hash('sha256', $code),
-        'expires_at' => now()->addMinutes(10),
+    ['secret' => $secret] = makeSession($customer);
+
+    $this->postJson('/api/auth/claim', ['secret' => $secret])
+        ->assertStatus(409)
+        ->assertJsonPath('code', 'login_pending');
+});
+
+it('wisselt het geheim in voor een werkend device-token na bevestiging', function () {
+    $customer = Customer::factory()->create();
+    ['session' => $session, 'secret' => $secret] = makeSession($customer, [
+        'status' => LoginSession::CONFIRMED,
+        'confirmed_at' => now(),
     ]);
 
-    $token = $this->postJson('/api/auth/claim', ['code' => $code])
+    $token = $this->postJson('/api/auth/claim', ['secret' => $secret])
         ->assertOk()
         ->json('device_token');
 
     expect($token)->toBeString();
+    expect($session->fresh()->status)->toBe('consumed');
 
-    // Het token werkt op een beschermd PWA-endpoint.
     $this->withToken($token)->getJson('/api/pwa/me')
         ->assertOk()
         ->assertJsonPath('id', $customer->id);
 });
 
-it('staat een claim-code maar één keer toe (single-use)', function () {
+it('staat een claim maar één keer toe (single-use)', function () {
     $customer = Customer::factory()->create();
-    $code = bin2hex(random_bytes(16));
-    DeviceClaim::create([
-        'customer_id' => $customer->id,
-        'code_hash' => hash('sha256', $code),
-        'expires_at' => now()->addMinutes(10),
+    ['secret' => $secret] = makeSession($customer, [
+        'status' => LoginSession::CONFIRMED,
+        'confirmed_at' => now(),
     ]);
 
-    $this->postJson('/api/auth/claim', ['code' => $code])->assertOk();
-    $this->postJson('/api/auth/claim', ['code' => $code])->assertStatus(409);
+    $this->postJson('/api/auth/claim', ['secret' => $secret])->assertOk();
+    $this->postJson('/api/auth/claim', ['secret' => $secret])
+        ->assertStatus(409)
+        ->assertJsonPath('code', 'login_consumed');
 });
 
-it('lekt niet of een e-mailadres bestaat bij magic-link', function () {
-    Mail::fake();
+it('kan niet inloggen met enkel de channel_hash (geen preimage)', function () {
+    $customer = Customer::factory()->create();
+    ['session' => $session, 'secret' => $secret] = makeSession($customer, [
+        'status' => LoginSession::CONFIRMED,
+        'confirmed_at' => now(),
+    ]);
 
-    $this->postJson('/api/auth/magic-link', ['email' => 'onbekend@niemand.test'])
-        ->assertStatus(202);
+    // Een aanvaller kent hooguit de kanaalnaam (= secret_hash), niet het preimage.
+    $this->postJson('/api/auth/claim', ['secret' => $session->secret_hash])
+        ->assertStatus(404)
+        ->assertJsonPath('code', 'login_invalid');
 
-    Mail::assertNothingQueued();
+    // De echte sessie is nog bruikbaar.
+    expect($session->fresh()->status)->toBe('confirmed');
 });

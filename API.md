@@ -35,21 +35,32 @@ Validatiefouten gebruiken het standaard Laravel-formaat (`422` met `errors`).
 
 ## Klant / PWA
 
-### `POST /api/auth/register`
-Body: `{ "email": "klant@example.com" }` → `202`. Maakt/zoekt de klant en mailt een ondertekende
-verificatielink. Lekt nooit of het adres al bestond. _Throttle: 6/min._
+> **Cross-device login (de PWA blijft in beeld).** De PWA genereert client-side een 256-bit
+> geheim `s` en stuurt alleen `channel_hash = sha256(s)`. De e-mailklik bevestigt de sessie;
+> de server pusht een seintje op het publieke kanaal `login.{channel_hash}` (payload zonder id/token),
+> waarna de PWA `s` inwisselt voor een token. De server kent `s` nooit; inloggen vereist het preimage,
+> dat alleen de initiërende PWA bezit.
 
-### `POST /api/auth/magic-link`
-Body: `{ "email": "klant@example.com" }` → `202`. Stuurt opnieuw een ondertekende link (herstel),
-maar alleen als de klant bestaat. _Throttle: 6/min._
+### `POST /api/auth/login-request`
+Body: `{ "email": "klant@example.com", "channel_hash": "<64 hex = sha256(secret)>" }` → `202`.
+Maakt/zoekt de klant, legt een login-sessie vast en mailt een ondertekende bevestigingslink.
+Generiek antwoord (lekt nooit of het adres al bestond). _Throttle: 6/min._
 
-### `GET /api/auth/verify/{customer}` _(signed)_
-Volgt vanuit de e-mail. Markeert `email_verified_at` en **redirect** naar de PWA op
-`{FRONTEND_URL}/claim?code=<eenmalige-code>`. Een ongeldige/ontbrekende signature → `403`.
+### `GET /api/auth/confirm/{token}` _(signed)_
+Volgt vanuit de e-mail. Markeert `email_verified_at`, zet de sessie op `confirmed` en zendt
+`LoginConfirmed` uit op `login.{secret_hash}`. Toont een eenvoudige "je bent ingelogd"-pagina
+(geen redirect). Idempotent. Ongeldige/ontbrekende signature → `403`; verlopen → `410`.
 
 ### `POST /api/auth/claim`
-Body: `{ "code": "<claim-code>" }` → `{ "device_token": "...", "customer": { ... } }`.
-Wisselt de eenmalige code in voor een Sanctum device-token (ability `customer`). _Throttle: 20/min._
+Body: `{ "secret": "<het geheim s>" }`. De PWA polt dit (naast de websocket-push) tot de sessie
+bevestigd is:
+- nog niet bevestigd → `409 { "code": "login_pending" }` (blijf pollen)
+- bevestigd → `200 { "device_token": "...", "customer": { ... } }` (Sanctum-token, ability `customer`; single-use)
+- al gebruikt → `409 login_consumed` · verlopen → `410 login_expired` · onbekend → `404 login_invalid`
+
+_Throttle: 60/min._ Inloggen met enkel `channel_hash` (zonder preimage) faalt met `404`.
+
+Realtime-kanaal: `login.{channel_hash}` (publiek), event `.login.confirmed`, payload `{ "confirmed": true }`.
 
 ### `GET /api/pwa/me` _(customer)_
 → `{ "id", "email", "name", "email_verified", "cards": [ ... ] }` — de klant met alle kaarten + saldi.

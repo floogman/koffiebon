@@ -14,16 +14,18 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 Route::prefix('auth')->group(function () {
-    Route::post('register', [CustomerAuthController::class, 'register'])
+    // Start een cross-device login (mailt een bevestigingslink).
+    Route::post('login-request', [CustomerAuthController::class, 'loginRequest'])
         ->middleware('throttle:6,1');
-    Route::post('magic-link', [CustomerAuthController::class, 'magicLink'])
-        ->middleware('throttle:6,1');
-    Route::post('claim', [CustomerAuthController::class, 'claim'])
-        ->middleware('throttle:20,1');
 
-    Route::get('verify/{customer}', [CustomerAuthController::class, 'verify'])
+    // De PWA polt dit (naast de websocket-push) tot de sessie bevestigd is.
+    Route::post('claim', [CustomerAuthController::class, 'claim'])
+        ->middleware('throttle:60,1');
+
+    // E-mailklik: bevestigt de sessie en seint de wachtende PWA in.
+    Route::get('confirm/{token}', [CustomerAuthController::class, 'confirm'])
         ->middleware('signed')
-        ->name('api.auth.verify');
+        ->name('api.auth.confirm');
 });
 
 /*

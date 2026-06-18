@@ -173,3 +173,28 @@ Log van bewuste keuzes tijdens de bouw. Zie `CLAUDE.md` voor de opdracht/spec.
 - `FRONTEND_URL` = `https://koffie.klusviewer.nl` zodat de QR-deeplinks (`/s/{nonce}`) en de
   claim-link naar de PWA op hetzelfde subdomein wijzen; de PWA praat same-origin met `/api`.
 - Alle artefacten staan in [`deploy/`](deploy); volledige handleiding in [`DEPLOY.md`](DEPLOY.md).
+
+## Cross-device login (PWA blijft in beeld)
+
+- **Probleem met de oude flow:** klikken op de e-maillink (verify → redirect `/claim?code=`) haalde de
+  gebruiker uit zijn PWA, zeker op een ander toestel. Vervangen door een login waarbij de PWA blijft staan.
+- **Nieuw model:** de PWA genereert client-side een 256-bit geheim `s` en stuurt **alleen
+  `channel_hash = sha256(s)`** mee bij `POST /api/auth/login-request`. De server kent `s` nooit (alleen
+  de hash, at rest in `login_sessions`). De e-mailklik (`GET /api/auth/confirm/{token}`, signed) zet de
+  sessie op `confirmed` en zendt een **publiek** event `login.{channel_hash}` uit met payload **zonder
+  id/token**. De PWA (die op het kanaal luistert én polt) wisselt daarna `s` in voor een Sanctum
+  device-token (`POST /api/auth/claim { secret }`, single-use, atomisch).
+- **Waarom veilig:** inloggen vereist het **preimage `s`**, dat alleen de initiërende PWA bezit. De push
+  draagt geen id/token, dus niemand kan een sessie kapen door een id naar een PWA te sturen; hooguit kun
+  je de kanaalnaam (de hash) kennen, en dáármee haalt de PWA zélf de login op — exact de gevraagde eis.
+  De e-mailbevestiging blijft het bewijs van inbox-controle.
+- **Push:** `LoginConfirmed` is `ShouldBroadcastNow` (direct, niet via queue) op een **publiek** `Channel`
+  (geen kanaal-auth nodig vóór login). **Polling** (claim elke ~3s, `409 login_pending`) is de fallback
+  als Reverb niet verbindt. De PWA bewaart de pending-login in `localStorage` en hervat na een refresh.
+- **Eén endpoint** `login-request` (register + magic-link samengevoegd); de register/login-toggle verviel.
+- **Bewust restrisico geaccepteerd:** initiator ≠ klikker (iemand start een login op jouw e-mail, jij
+  klikt). Géén match-code toegevoegd — de e-mail is hier onderdeel van de login en fysieke aanwezigheid
+  aan de balie is sowieso nodig om koffie te verzilveren, dus de impact is verwaarloosbaar.
+- **`device_claims` → `login_sessions`:** de wegwerp-handshake is vervangen; durable device-identiteit
+  zat altijd al in de Sanctum-tokens (`personal_access_tokens`), niet in de claims. Echte web-push
+  (PWA dicht) zou later een aparte `push_subscriptions`-tabel vragen — losstaand hiervan.

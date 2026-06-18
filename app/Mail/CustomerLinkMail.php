@@ -2,7 +2,6 @@
 
 namespace App\Mail;
 
-use App\Models\Customer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -12,44 +11,44 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\URL;
 
 /**
- * E-mail met een ondertekende verificatie-/inloglink naar de PWA.
- * Wordt gebruikt voor zowel eerste registratie als het inloggen met je e-mailadres.
+ * E-mail met de ondertekende bevestigingslink voor de cross-device login. Eén klik
+ * bevestigt de login-sessie; de wachtende PWA wordt daarna automatisch ingelogd, dus
+ * de gebruiker hoeft zijn app niet te verlaten.
  *
- * De ondertekende link wordt op het VERZENDMOMENT gegenereerd (in content()),
- * niet bij het in de wachtrij zetten. Zo begint de TTL pas te lopen wanneer de
- * mail echt verstuurd wordt en arriveert de link nooit al verlopen door queue-vertraging.
+ * De ondertekende link wordt op het VERZENDMOMENT gegenereerd (in content()), zodat de
+ * TTL pas loopt wanneer de mail echt verstuurd wordt — nooit al verlopen door queue-vertraging.
  */
 class CustomerLinkMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
     public function __construct(
-        public Customer $customer,
-        public bool $isLogin = false,
+        public string $emailToken,
+        public bool $isNew = false,
     ) {}
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: $this->isLogin
-                ? 'Je Koffiebon-inloglink'
-                : 'Bevestig je e-mailadres voor Koffiebon',
+            subject: $this->isNew
+                ? 'Bevestig je e-mailadres voor Koffiebon'
+                : 'Je Koffiebon-inloglink',
         );
     }
 
     public function content(): Content
     {
         $url = URL::temporarySignedRoute(
-            'api.auth.verify',
-            now()->addMinutes(config('koffiebon.verification_link_minutes')),
-            ['customer' => $this->customer->getKey()],
+            'api.auth.confirm',
+            now()->addMinutes(config('koffiebon.login_session_minutes')),
+            ['token' => $this->emailToken],
         );
 
         return new Content(
             view: 'mail.customer-link',
             with: [
                 'url' => $url,
-                'isLogin' => $this->isLogin,
+                'isNew' => $this->isNew,
             ],
         );
     }

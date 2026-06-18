@@ -17,21 +17,23 @@
                     </tr>
                     <tr>
                         <td style="padding:32px;">
-                            @if ($isLogin)
-                                <h1 style="margin:0 0 12px;font-size:20px;">Inloggen op dit toestel</h1>
-                                <p style="margin:0 0 24px;line-height:1.5;color:#3a2a20;">
-                                    Klik op de knop om in te loggen en je Koffiebon-kaarten op dit toestel te
-                                    laden. Je kaarten en saldo staan veilig op de server.
-                                </p>
-                            @else
+                            @if ($isNew)
                                 <h1 style="margin:0 0 12px;font-size:20px;">Bevestig je e-mailadres</h1>
                                 <p style="margin:0 0 24px;line-height:1.5;color:#3a2a20;">
-                                    Welkom! Bevestig je e-mailadres om je Koffiebon te kunnen gebruiken.
+                                    Welkom! Klik op de knop om je e-mailadres te bevestigen en in te loggen.
+                                    Daarna kun je terug naar de Koffiebon-app — die logt zichzelf in.
+                                </p>
+                            @else
+                                <h1 style="margin:0 0 12px;font-size:20px;">Inloggen op Koffiebon</h1>
+                                <p style="margin:0 0 24px;line-height:1.5;color:#3a2a20;">
+                                    Klik op de knop om in te loggen. Daarna kun je terug naar de Koffiebon-app
+                                    waar je dit startte — die logt zichzelf in. Je kaarten en saldo staan veilig
+                                    op de server.
                                 </p>
                             @endif
 
                             <a href="{{ $url }}" style="display:inline-block;background:#c5772a;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:700;">
-                                {{ $isLogin ? 'Inloggen' : 'E-mailadres bevestigen' }}
+                                {{ $isNew ? 'E-mailadres bevestigen' : 'Inloggen' }}
                             </a>
 
                             <p style="margin:24px 0 0;font-size:13px;color:#8a7565;line-height:1.5;">

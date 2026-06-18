@@ -46,10 +46,12 @@ De app draait nu op **http://localhost** (API), Mailpit op **http://localhost:80
 Lokaal dev draait op **SQLite** (`database/database.sqlite`). PostgreSQL zit achter een compose-profile
 en hoeft niet te starten: `./vendor/bin/sail --profile pgsql up -d` indien gewenst.
 
-### E-mail (verificatie / magic-link)
+### E-mail (cross-device login)
 
-Lokaal staat `QUEUE_CONNECTION=sync`, dus verificatie-/herstelmails worden **direct in-process**
-verstuurd — **geen `queue:work`-worker nodig**. Ze landen in **Mailpit** (http://localhost:8025).
+Inloggen gaat via een **bevestigingslink** per e-mail; de PWA blijft in beeld en logt zichzelf in
+zodra je de link klikt (op welk toestel dan ook). Lokaal staat `QUEUE_CONNECTION=sync`, dus de mail
+gaat **direct in-process** — **geen `queue:work`-worker nodig**. Mails landen in **Mailpit**
+(http://localhost:8025).
 
 In productie zet je `QUEUE_CONNECTION=database` en draai je een worker:
 
@@ -57,8 +59,8 @@ In productie zet je `QUEUE_CONNECTION=database` en draai je een worker:
 ./vendor/bin/sail artisan queue:work
 ```
 
-> De ondertekende verificatielink wordt op het **verzendmoment** gegenereerd (TTL 24u), dus ook met
-> een trage queue arriveert hij nooit al verlopen.
+> De ondertekende bevestigingslink wordt op het **verzendmoment** gegenereerd (TTL = `login_session_minutes`,
+> standaard 30 min), dus ook met een trage queue arriveert hij nooit al verlopen.
 
 ### Frontend (Vite PWA) & Reverb — draaien automatisch
 
@@ -112,8 +114,9 @@ De demo-klant heeft één actieve kaart **"12 voor de prijs van 10"** met saldo 
 
 ## De flow in het kort
 
-1. **Klant registreert** → e-mail verifiëren → PWA krijgt een device-token.
+1. **Klant logt in** → vult e-mail in → klikt de bevestigingslink (welk toestel dan ook) → de
+   wachtende PWA wordt **automatisch** ingelogd (cross-device) en krijgt een device-token.
 2. **Kaart kopen** → klant toont identify-QR → balie scant → kiest product → legt betaling vast →
    `issue + activate + payment` in één transactie → kaart actief.
 3. **Koffie verzilveren** → klant toont roterende redeem-QR → balie scant → `−1 kop` (atomisch).
-4. **Herstel** → magic-link op een ander toestel → zelfde kaarten/saldi vanaf de server.
+4. **Herstel** → op een ander toestel opnieuw inloggen → zelfde kaarten/saldi vanaf de server.

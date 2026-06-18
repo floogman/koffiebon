@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
 
 import CustomerApp from './customer/App'
-import ClaimPage from './customer/pages/ClaimPage'
 import DeeplinkPage from './customer/pages/DeeplinkPage'
 import BalieApp from './balie/App'
 import DashboardPage from './balie/pages/DashboardPage'
@@ -18,7 +17,6 @@ const queryClient = new QueryClient({
 
 const router = createBrowserRouter([
     { path: '/', element: <CustomerApp /> },
-    { path: '/claim', element: <ClaimPage /> },
     { path: '/s/:nonce', element: <DeeplinkPage /> },
     { path: '/balie/*', element: <BalieApp /> },
     { path: '/dashboard', element: <DashboardPage /> },
