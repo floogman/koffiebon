@@ -12,13 +12,17 @@ import RotatingQr from './RotatingQr'
  * QR en komt op de nieuwe kaart te staan. Bij verzilveren toont de QR het vaste
  * drankje van de kaart. Het saldo blijft live verversen op de achtergrond.
  */
+type Done = { action: 'redeemed' | 'activated' | 'issued'; card: Card }
+
 export default function QrOverlay({
     mode,
     card,
+    done,
     onClose,
 }: {
     mode: 'identify' | 'redeem'
     card?: Card
+    done?: Done
     onClose: () => void
 }) {
     // Drankenkaart alleen nodig bij het kopen van een kaart.
@@ -53,13 +57,42 @@ export default function QrOverlay({
             <div className="mx-auto flex w-full max-w-md flex-1 flex-col overflow-y-auto px-5 py-6">
                 <div className="flex items-center justify-between">
                     <h2 className="text-lg font-bold">
-                        {mode === 'identify' ? 'Koop een kaart' : card?.product?.name ?? 'Jouw kaart'}
+                        {done ? 'Gelukt' : mode === 'identify' ? 'Koop een kaart' : card?.product?.name ?? 'Jouw kaart'}
                     </h2>
                     <button className="btn-ghost px-3 py-2 text-2xl leading-none" onClick={onClose} aria-label="Sluiten">
                         ×
                     </button>
                 </div>
 
+                {done ? (
+                    <div className="flex flex-1 flex-col items-center justify-center gap-6 py-4 text-center">
+                        <div className="text-7xl">{done.action === 'issued' ? '🎉' : '☕'}</div>
+                        <div>
+                            <h1 className="text-2xl font-extrabold">
+                                {done.action === 'issued'
+                                    ? 'Je kaart is klaar!'
+                                    : done.action === 'activated'
+                                      ? 'Kaart geactiveerd!'
+                                      : done.card.cups_remaining === 0
+                                        ? 'Geschonken — kaart is nu leeg'
+                                        : 'Geschonken!'}
+                            </h1>
+                            {done.card.preferred_drink_label && (
+                                <p className="mt-1 text-sm text-muted">☕ {done.card.preferred_drink_label}</p>
+                            )}
+                        </div>
+                        <div className="rounded-2xl bg-espresso px-8 py-5 text-cream">
+                            <div className="text-5xl font-extrabold">
+                                {done.card.cups_remaining}
+                                <span className="text-2xl opacity-70"> / {done.card.cups_total}</span>
+                            </div>
+                            <div className="text-sm opacity-80">koppen over</div>
+                        </div>
+                        <button className="btn-primary w-full max-w-xs" onClick={onClose}>
+                            Klaar
+                        </button>
+                    </div>
+                ) : (
                 <div className="flex flex-1 flex-col items-center justify-center gap-6 py-4">
                     {mode === 'identify' && (
                         <div className="w-full">
@@ -114,6 +147,7 @@ export default function QrOverlay({
                             : 'Elke scan haalt één kop van je kaart. De code ververst automatisch.'}
                     </p>
                 </div>
+                )}
             </div>
         </div>
     )

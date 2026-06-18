@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { customerApi } from '@shared/clients'
 import { customerToken } from '@shared/auth'
@@ -23,10 +23,19 @@ function flashFor({ action, card }: CardUpdate): string {
     }
 }
 
+type OverlayState = { mode: 'identify' | 'redeem'; cardId?: number; done?: CardUpdate }
+
 export default function HomePage({ onSignOut }: { onSignOut: () => void }) {
-    const [overlay, setOverlay] = useState<{ mode: 'identify' | 'redeem'; cardId?: number } | null>(null)
+    const [overlay, setOverlay] = useState<OverlayState | null>(null)
     const [flash, setFlash] = useState<string | null>(null)
     const queryClient = useQueryClient()
+
+    // Spiegelt de actuele overlay zodat de (niet opnieuw abonnerende) Reverb-listener
+    // synchroon kan bepalen of de scan bij het open scherm hoort.
+    const overlayRef = useRef<OverlayState | null>(overlay)
+    useEffect(() => {
+        overlayRef.current = overlay
+    }, [overlay])
 
     const { data, isLoading, isError } = useQuery({
         queryKey: ['me'],
@@ -47,15 +56,19 @@ export default function HomePage({ onSignOut }: { onSignOut: () => void }) {
         const channel = `Customer.${customerId}`
         echo.private(channel).listen('.card.updated', (e: CardUpdate) => {
             queryClient.invalidateQueries({ queryKey: ['me'] })
-            setFlash(flashFor(e))
-            // Na een scan terug naar de kaartpagina ('Toon aan de balie') met het nieuwe saldo,
-            // i.p.v. op de QR blijven hangen.
-            setOverlay((o) => {
-                if (!o) return o
-                if (e.action === 'issued' && o.mode === 'identify') return null
-                if (e.action === 'redeemed' && o.mode === 'redeem' && o.cardId === e.card.id) return null
-                return o
-            })
+
+            // Hoort de scan bij het open QR-scherm? Dan de QR vervangen door een
+            // succesresultaat (blijft staan tot de klant sluit). Anders een korte toast.
+            const o = overlayRef.current
+            const matchesOpenQr =
+                (e.action === 'issued' && o?.mode === 'identify') ||
+                (e.action === 'redeemed' && o?.mode === 'redeem' && o?.cardId === e.card.id)
+
+            if (matchesOpenQr) {
+                setOverlay((cur) => (cur ? { ...cur, done: e } : cur))
+            } else {
+                setFlash(flashFor(e))
+            }
         })
 
         return () => {
@@ -152,7 +165,12 @@ export default function HomePage({ onSignOut }: { onSignOut: () => void }) {
             </Screen>
 
             {overlay && (
-                <QrOverlay mode={overlay.mode} card={overlayCard} onClose={() => setOverlay(null)} />
+                <QrOverlay
+                    mode={overlay.mode}
+                    card={overlayCard}
+                    done={overlay.done}
+                    onClose={() => setOverlay(null)}
+                />
             )}
         </>
     )
