@@ -21,12 +21,16 @@ export default function ScanPage({ staff, onSignOut }: { staff: Staff | null; on
     const [view, setView] = useState<View>({ kind: 'scan' })
     const [camera, setCamera] = useState(true)
     const [manual, setManual] = useState('')
+    // `busy` (ref) blokkeert synchroon re-entry; `submitting` (state) zet de camera/invoer
+    // doof en toont de spinner tussen versturen en het renderen van het resultaat.
     const busy = useRef(false)
+    const [submitting, setSubmitting] = useState(false)
 
     // Het geschonken drankje staat vast op de kaart van de klant; de balie kiest niets.
     const process = useCallback(async (raw: string) => {
         if (busy.current) return
         busy.current = true
+        setSubmitting(true)
         try {
             const res = await staffApi.scan(extractNonce(raw))
             if (res.type === 'identify') {
@@ -40,6 +44,7 @@ export default function ScanPage({ staff, onSignOut }: { staff: Staff | null; on
             setView({ kind: 'error', message: isApiError(e) ? e.message : 'Scan mislukt.' })
         } finally {
             busy.current = false
+            setSubmitting(false)
         }
     }, [])
 
@@ -79,8 +84,8 @@ export default function ScanPage({ staff, onSignOut }: { staff: Staff | null; on
                 </div>
             </header>
 
-            {/* Hardware-scanner luistert alleen tijdens het scannen. */}
-            <HardwareScanInput enabled={view.kind === 'scan'} onScan={process} />
+            {/* Hardware-scanner luistert alleen tijdens het scannen, niet tijdens het versturen. */}
+            <HardwareScanInput enabled={view.kind === 'scan' && !submitting} onScan={process} />
 
             {view.kind === 'scan' && (
                 <div className="flex flex-col gap-4">
@@ -88,16 +93,16 @@ export default function ScanPage({ staff, onSignOut }: { staff: Staff | null; on
                         Scan de QR van de klant met de camera of een hardware-scanner.
                     </p>
 
-                    {camera ? <CameraScanner onResult={process} /> : null}
+                    {camera ? <CameraScanner onResult={process} paused={submitting} /> : null}
 
-                    <button className="btn-ghost text-sm" onClick={() => setCamera((c) => !c)}>
+                    <button className="btn-ghost text-sm" onClick={() => setCamera((c) => !c)} disabled={submitting}>
                         {camera ? 'Camera uit' : 'Camera aan'}
                     </button>
 
                     <form
                         onSubmit={(e) => {
                             e.preventDefault()
-                            if (manual.trim()) process(manual)
+                            if (manual.trim() && !submitting) process(manual)
                         }}
                         className="flex gap-2"
                     >
@@ -106,8 +111,11 @@ export default function ScanPage({ staff, onSignOut }: { staff: Staff | null; on
                             placeholder="…of typ de 6-cijferige code"
                             value={manual}
                             onChange={(e) => setManual(e.target.value)}
+                            disabled={submitting}
                         />
-                        <button className="btn-primary px-4">Ga</button>
+                        <button className="btn-primary px-4" disabled={submitting}>
+                            Ga
+                        </button>
                     </form>
                 </div>
             )}
@@ -188,7 +196,7 @@ export default function ScanPage({ staff, onSignOut }: { staff: Staff | null; on
                 </div>
             )}
 
-            {busy.current && view.kind === 'scan' && (
+            {submitting && view.kind === 'scan' && (
                 <div className="mt-4 flex justify-center">
                     <Spinner />
                 </div>

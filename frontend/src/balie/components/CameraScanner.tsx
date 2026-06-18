@@ -5,14 +5,26 @@ import type { IScannerControls } from '@zxing/browser'
 /**
  * Camera-scanner via @zxing/browser. Roept onResult met de ruwe QR-tekst.
  * Een korte cooldown voorkomt dat dezelfde code meermaals achter elkaar afgaat.
+ *
+ * `paused` zet het decoderen volledig stil — gebruikt tussen het versturen van een
+ * scan en het renderen van het resultaat, zodat dezelfde QR niet opnieuw afgaat.
  */
-export default function CameraScanner({ onResult }: { onResult: (text: string) => void }) {
+export default function CameraScanner({
+    onResult,
+    paused = false,
+}: {
+    onResult: (text: string) => void
+    paused?: boolean
+}) {
     const videoRef = useRef<HTMLVideoElement>(null)
     const controlsRef = useRef<IScannerControls | null>(null)
     const lastRef = useRef<{ text: string; at: number }>({ text: '', at: 0 })
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
+        // Tijdens het verwerken: camera doof. Bij hervatten start het decoderen opnieuw.
+        if (paused) return
+
         const reader = new BrowserQRCodeReader()
         let cancelled = false
 
@@ -35,8 +47,9 @@ export default function CameraScanner({ onResult }: { onResult: (text: string) =
         return () => {
             cancelled = true
             controlsRef.current?.stop()
+            controlsRef.current = null
         }
-    }, [onResult])
+    }, [onResult, paused])
 
     return (
         <div className="overflow-hidden rounded-2xl bg-black">
@@ -48,6 +61,11 @@ export default function CameraScanner({ onResult }: { onResult: (text: string) =
                 <div className="relative">
                     <video ref={videoRef} className="h-56 w-full object-cover" muted playsInline />
                     <div className="pointer-events-none absolute inset-0 m-auto h-40 w-40 rounded-xl border-2 border-white/70" />
+                    {paused && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-sm font-semibold text-white">
+                            Verwerken…
+                        </div>
+                    )}
                 </div>
             )}
         </div>
